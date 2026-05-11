@@ -67,6 +67,7 @@ xvault bookmarks folders --json
 xvault search "query" --source bookmarks --limit 10 --json
 xvault search --recent --source bookmarks --limit 10 --json
 xvault count bookmarks --json
+xvault verify-archive --json
 xvault show TWEET_ID --json
 xvault export json --collection all --output archive.json --json
 xvault export json --collection bookmarks --folder Research --output research-bookmarks.json --json

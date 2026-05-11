@@ -128,6 +128,7 @@ func addCommands(root *cobra.Command, st *state) {
 	root.AddCommand(statusCmd(st), doctorCmd(st), statsCmd(st), authCmd(st), configCmd(st), syncCmd(st), searchCmd(st), showCmd(st), showURLCmd(st), openCmd(st), threadCmd(st), conversationCmd(st), exportCmd(st), dbCmd(st), backupCmd(st), vacuumCmd(st), serviceCmd(st), refreshIDsCmd(st))
 	root.AddCommand(bookmarksCmd(st))
 	root.AddCommand(countCmd(st))
+	root.AddCommand(verifyArchiveCmd(st))
 }
 
 func statusCmd(st *state) *cobra.Command {
@@ -635,6 +636,50 @@ func countCmd(st *state) *cobra.Command {
 			writeJSON(os.Stdout, "count", st.started, data)
 		} else {
 			human(os.Stdout, "%d", count)
+		}
+		return nil
+	}}
+}
+
+func verifyArchiveCmd(st *state) *cobra.Command {
+	return &cobra.Command{Use: "verify-archive", RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		integrity, err := s.Integrity(cmd.Context())
+		if err != nil {
+			return err
+		}
+		bookmarkCount, err := s.CollectionCount(cmd.Context(), "bookmarks")
+		if err != nil {
+			return err
+		}
+		likeCount, err := s.CollectionCount(cmd.Context(), "likes")
+		if err != nil {
+			return err
+		}
+		bookmarkRows, err := s.SearchWithFilters(cmd.Context(), "", "bookmarks", "", "", "", "", false, false, 1, 0)
+		if err != nil {
+			return err
+		}
+		likeRows, err := s.SearchWithFilters(cmd.Context(), "", "likes", "", "", "", "", false, false, 1, 0)
+		if err != nil {
+			return err
+		}
+		data := map[string]any{
+			"integrity":           integrity,
+			"bookmarks_count":     bookmarkCount,
+			"likes_count":         likeCount,
+			"bookmarks_queryable": len(bookmarkRows) > 0,
+			"likes_queryable":     len(likeRows) > 0,
+			"ok":                  integrity == "ok" && bookmarkCount > 0 && likeCount > 0 && len(bookmarkRows) > 0 && len(likeRows) > 0,
+		}
+		if st.json {
+			writeJSON(os.Stdout, "verify-archive", st.started, data)
+		} else {
+			human(os.Stdout, "bookmarks=%d likes=%d integrity=%s", bookmarkCount, likeCount, integrity)
 		}
 		return nil
 	}}
