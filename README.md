@@ -75,6 +75,8 @@ xvault thread TWEET_ID --json
 xvault conversation TWEET_ID --json
 ```
 
+See `docs/PUBLISHING.md` for GitHub release and container verification steps.
+
 ## Limitations
 
 X internal GraphQL operation IDs and response layouts change over time. `xvault` ships static fallback IDs and a parser for bundle-discovered query IDs, but real sync may require refreshing operation IDs when X changes web traffic.
