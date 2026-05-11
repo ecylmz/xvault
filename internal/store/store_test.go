@@ -159,3 +159,35 @@ func TestRawPayloadRoundTrip(t *testing.T) {
 		t.Fatalf("raw = %s", raw)
 	}
 }
+
+func TestCheckpointRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	st, err := Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	cp := Checkpoint{
+		CollectionType: "bookmark",
+		Cursor:         "CURSOR-1",
+		LastTweetID:    "100",
+		LastSortIndex:  "900",
+		TotalSeen:      25,
+	}
+	if err := st.SaveCheckpoint(ctx, cp); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := st.LoadCheckpoint(ctx, "bookmark")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || got.Cursor != "CURSOR-1" || got.LastTweetID != "100" || got.LastSortIndex != "900" || got.TotalSeen != 25 || got.Status != "in_progress" {
+		t.Fatalf("checkpoint = %#v, ok=%v", got, ok)
+	}
+	if err := st.ClearCheckpoint(ctx, "bookmark"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := st.LoadCheckpoint(ctx, "bookmark"); err != nil || ok {
+		t.Fatalf("expected cleared checkpoint, ok=%v err=%v", ok, err)
+	}
+}

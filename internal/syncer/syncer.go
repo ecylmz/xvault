@@ -59,12 +59,29 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 		return Result{}, err
 	}
 	res := Result{Collection: req.Collection, Mode: "incremental", DBPath: s.dbPath}
+	if req.Full {
+		res.Mode = "full"
+		if err := s.store.ClearCheckpoint(ctx, collectionDBValue(req.Collection)); err != nil {
+			return Result{}, err
+		}
+	}
 	limit := req.Count
 	if req.All {
 		limit = -1
 	}
 	for _, op := range ops {
 		cursor := ""
+		checkpointType := collectionDBValue(req.Collection)
+		if !req.Full {
+			cp, ok, err := s.store.LoadCheckpoint(ctx, checkpointType)
+			if err != nil {
+				return res, err
+			}
+			if ok && cp.Status == "in_progress" && cp.Cursor != "" {
+				cursor = cp.Cursor
+				res.NextCursor = cursor
+			}
+		}
 		seenCursors := map[string]bool{}
 		seenTweets := map[string]bool{}
 		unchangedPages := 0
@@ -120,12 +137,27 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 			res.TweetsSeen += len(page.Tweets)
 			res.TweetsInserted += newInPage
 			cursor = page.NextCursor
+			res.NextCursor = cursor
 			if limit > 0 && res.TweetsSeen >= limit {
+				if cursor != "" {
+					if err := s.saveCheckpoint(ctx, checkpointType, cursor, res.TweetsSeen, page); err != nil {
+						return res, err
+					}
+				}
 				return res, nil
 			}
 			if cursor == "" || unchangedPages >= 2 {
+				if err := s.store.ClearCheckpoint(ctx, checkpointType); err != nil {
+					return res, err
+				}
 				res.CheckpointCleared = true
 				break
+			}
+			if err := s.saveCheckpoint(ctx, checkpointType, cursor, res.TweetsSeen, page); err != nil {
+				return res, err
+			}
+			if req.MaxPages > 0 && res.PagesFetched >= req.MaxPages {
+				return res, nil
 			}
 			if s.delay > 0 {
 				select {
@@ -137,6 +169,23 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 		}
 	}
 	return res, nil
+}
+
+func (s *Syncer) saveCheckpoint(ctx context.Context, collectionType, cursor string, totalSeen int, page model.ParsedPage) error {
+	cp := store.Checkpoint{CollectionType: collectionType, Cursor: cursor, TotalSeen: totalSeen, Status: "in_progress"}
+	for i := len(page.Tweets) - 1; i >= 0; i-- {
+		if page.Tweets[i].ID != "" {
+			cp.LastTweetID = page.Tweets[i].ID
+			break
+		}
+	}
+	for i := len(page.Collections) - 1; i >= 0; i-- {
+		if page.Collections[i].SortIndex != "" {
+			cp.LastSortIndex = page.Collections[i].SortIndex
+			break
+		}
+	}
+	return s.store.SaveCheckpoint(ctx, cp)
 }
 
 func normalizePageForCollection(page model.ParsedPage, collection string) model.ParsedPage {
