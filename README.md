@@ -9,6 +9,7 @@ The current implementation is an early v1 track focused on:
 - local SQLite storage and FTS search
 - `show`, `stats`, `doctor`, `db`, `backup`, and export commands
 - deterministic `--json` envelopes for agent usage
+- `thread` and `conversation` commands that expand via X `TweetDetail` and then read from SQLite
 
 ## Security
 
@@ -64,6 +65,8 @@ xvault export csv --collection all --output archive.csv --json
 xvault export html --collection all --output archive.html --json
 xvault db integrity --json
 xvault db rebuild-fts --json
+xvault thread TWEET_ID --json
+xvault conversation TWEET_ID --json
 ```
 
 ## Limitations
