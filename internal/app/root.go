@@ -395,6 +395,32 @@ func syncCmd(st *state) *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&withThreads, "with-threads", false, "expand threads after sync")
 	cmd.PersistentFlags().StringVar(&threadMode, "thread-mode", "thread", "thread expansion mode")
 	cmd.PersistentFlags().IntVar(&threadLimit, "thread-limit", 200, "thread expansion limit")
+	var runsCollection, runsStatus string
+	var runsLimit int
+	runsCmd := &cobra.Command{Use: "runs", RunE: func(c *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		runs, err := s.ListSyncRuns(c.Context(), runsCollection, runsStatus, runsLimit)
+		if err != nil {
+			return err
+		}
+		data := map[string]any{"runs": runs, "count": len(runs), "collection": runsCollection, "status": runsStatus}
+		if st.json {
+			writeJSON(os.Stdout, "sync runs", st.started, data)
+		} else {
+			for _, run := range runs {
+				human(os.Stdout, "%s %s %s pages=%d tweets=%d", run.ID, run.CollectionType, run.Status, run.PagesFetched, run.TweetsSeen)
+			}
+		}
+		return nil
+	}}
+	runsCmd.Flags().StringVar(&runsCollection, "collection", "all", "collection filter")
+	runsCmd.Flags().StringVar(&runsStatus, "status", "all", "status filter")
+	runsCmd.Flags().IntVar(&runsLimit, "limit", 20, "run limit")
+	cmd.AddCommand(runsCmd)
 	for _, name := range []string{"likes", "bookmarks", "tweets", "reposts", "replies", "posts", "feed"} {
 		n := name
 		cmd.AddCommand(&cobra.Command{Use: n, RunE: func(c *cobra.Command, args []string) error {

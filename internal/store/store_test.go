@@ -245,4 +245,11 @@ func TestSyncRunLifecycle(t *testing.T) {
 	if got.Status != "partial" || got.PagesFetched != 2 || got.TweetsSeen != 10 || got.ErrorCode != "RATE_LIMITED" {
 		t.Fatalf("sync run = %#v", got)
 	}
+	runs, err := st.ListSyncRuns(ctx, "likes", "partial", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 || runs[0].ID != id || runs[0].FinishedAt == "" || runs[0].StartedAt == "" {
+		t.Fatalf("sync runs = %#v", runs)
+	}
 }

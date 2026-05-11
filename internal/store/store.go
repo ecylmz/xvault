@@ -38,19 +38,21 @@ type Checkpoint struct {
 }
 
 type SyncRun struct {
-	ID              string
-	CollectionType  string
-	Mode            string
-	Status          string
-	PagesFetched    int
-	TweetsSeen      int
-	TweetsInserted  int
-	TweetsUpdated   int
-	TweetsUnchanged int
-	ErrorsCount     int
-	RateLimitCount  int
-	ErrorCode       string
-	ErrorMessage    string
+	ID              string `json:"id"`
+	CollectionType  string `json:"collection_type"`
+	Mode            string `json:"mode"`
+	Status          string `json:"status"`
+	PagesFetched    int    `json:"pages_fetched"`
+	TweetsSeen      int    `json:"tweets_seen"`
+	TweetsInserted  int    `json:"tweets_inserted"`
+	TweetsUpdated   int    `json:"tweets_updated"`
+	TweetsUnchanged int    `json:"tweets_unchanged"`
+	ErrorsCount     int    `json:"errors_count"`
+	RateLimitCount  int    `json:"rate_limit_count"`
+	ErrorCode       string `json:"error_code,omitempty"`
+	ErrorMessage    string `json:"error_message,omitempty"`
+	StartedAt       string `json:"started_at"`
+	FinishedAt      string `json:"finished_at,omitempty"`
 }
 
 func Open(path string) (*Store, error) {
@@ -699,15 +701,50 @@ func (s *Store) FinishSyncRun(ctx context.Context, run SyncRun) error {
 
 func (s *Store) GetSyncRun(ctx context.Context, id string) (SyncRun, error) {
 	var run SyncRun
-	var errorCode, errorMessage sql.NullString
-	err := s.db.QueryRowContext(ctx, `SELECT id, collection_type, mode, status, pages_fetched, tweets_seen, tweets_inserted, tweets_updated, tweets_unchanged, errors_count, rate_limit_count, error_code, error_message FROM sync_runs WHERE id=?`, id).
-		Scan(&run.ID, &run.CollectionType, &run.Mode, &run.Status, &run.PagesFetched, &run.TweetsSeen, &run.TweetsInserted, &run.TweetsUpdated, &run.TweetsUnchanged, &run.ErrorsCount, &run.RateLimitCount, &errorCode, &errorMessage)
+	var errorCode, errorMessage, finishedAt sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT id, collection_type, mode, status, pages_fetched, tweets_seen, tweets_inserted, tweets_updated, tweets_unchanged, errors_count, rate_limit_count, error_code, error_message, started_at, finished_at FROM sync_runs WHERE id=?`, id).
+		Scan(&run.ID, &run.CollectionType, &run.Mode, &run.Status, &run.PagesFetched, &run.TweetsSeen, &run.TweetsInserted, &run.TweetsUpdated, &run.TweetsUnchanged, &run.ErrorsCount, &run.RateLimitCount, &errorCode, &errorMessage, &run.StartedAt, &finishedAt)
 	if err != nil {
 		return SyncRun{}, err
 	}
 	run.ErrorCode = errorCode.String
 	run.ErrorMessage = errorMessage.String
+	run.FinishedAt = finishedAt.String
 	return run, nil
+}
+
+func (s *Store) ListSyncRuns(ctx context.Context, collection, status string, limit int) ([]SyncRun, error) {
+	if limit <= 0 {
+		limit = 20
+	} else if limit > 500 {
+		limit = 500
+	}
+	where := []string{"1=1"}
+	args := []any{}
+	if collection != "" && collection != "all" {
+		where = append(where, "collection_type=?")
+		args = append(args, normalizeCollection(collection))
+	}
+	if status != "" && status != "all" {
+		where = append(where, "status=?")
+		args = append(args, status)
+	}
+	args = append(args, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, collection_type, mode, status, pages_fetched, tweets_seen, tweets_inserted, tweets_updated, tweets_unchanged, errors_count, rate_limit_count, COALESCE(error_code,''), COALESCE(error_message,''), started_at, COALESCE(finished_at,'')
+FROM sync_runs WHERE `+strings.Join(where, " AND ")+` ORDER BY started_at DESC, id DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SyncRun
+	for rows.Next() {
+		var run SyncRun
+		if err := rows.Scan(&run.ID, &run.CollectionType, &run.Mode, &run.Status, &run.PagesFetched, &run.TweetsSeen, &run.TweetsInserted, &run.TweetsUpdated, &run.TweetsUnchanged, &run.ErrorsCount, &run.RateLimitCount, &run.ErrorCode, &run.ErrorMessage, &run.StartedAt, &run.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, run)
+	}
+	return out, rows.Err()
 }
 
 func newRunID() string {
