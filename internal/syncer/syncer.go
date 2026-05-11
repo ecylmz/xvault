@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ecylmz/xvault/internal/client"
+	"github.com/ecylmz/xvault/internal/model"
 	"github.com/ecylmz/xvault/internal/parser"
 	"github.com/ecylmz/xvault/internal/queryids"
 	"github.com/ecylmz/xvault/internal/store"
@@ -94,6 +95,7 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 			if err != nil {
 				return res, err
 			}
+			page = normalizePageForCollection(page, req.Collection)
 			for i := range page.Tweets {
 				if page.Tweets[i].RawJSONID == "" {
 					page.Tweets[i].RawJSONID = rawID
@@ -135,6 +137,73 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 		}
 	}
 	return res, nil
+}
+
+func normalizePageForCollection(page model.ParsedPage, collection string) model.ParsedPage {
+	keep := map[string]bool{}
+	filtered := page.Tweets[:0]
+	for _, tw := range page.Tweets {
+		include := true
+		switch collection {
+		case "tweets":
+			include = !tw.IsRetweet && !tw.IsReply
+		case "replies":
+			include = tw.IsReply
+		case "reposts":
+			include = tw.IsRetweet || tw.RetweetedTweetID != ""
+		}
+		if include {
+			filtered = append(filtered, tw)
+			keep[tw.ID] = true
+		}
+	}
+	if collection == "posts" {
+		for _, tw := range page.Tweets {
+			keep[tw.ID] = true
+		}
+		filtered = page.Tweets
+	}
+	page.Tweets = filtered
+	collections := []model.CollectionItem{}
+	for _, item := range page.Collections {
+		if keep[item.TweetID] {
+			collections = append(collections, item)
+		}
+	}
+	if collection == "posts" {
+		for _, tw := range page.Tweets {
+			collections = append(collections, model.CollectionItem{TweetID: tw.ID, CollectionType: "post"})
+			if tw.IsRetweet || tw.RetweetedTweetID != "" {
+				collections = append(collections, model.CollectionItem{TweetID: tw.ID, CollectionType: "repost"})
+			} else if !tw.IsReply {
+				collections = append(collections, model.CollectionItem{TweetID: tw.ID, CollectionType: "tweet"})
+			}
+		}
+	}
+	page.Collections = collections
+	page.URLs = filterURLs(page.URLs, keep)
+	page.Media = filterMedia(page.Media, keep)
+	return page
+}
+
+func filterURLs(in []model.URL, keep map[string]bool) []model.URL {
+	out := in[:0]
+	for _, u := range in {
+		if keep[u.TweetID] {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
+func filterMedia(in []model.Media, keep map[string]bool) []model.Media {
+	out := in[:0]
+	for _, m := range in {
+		if keep[m.TweetID] {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 func (s *Syncer) operations(req Request) ([]client.Operation, error) {
