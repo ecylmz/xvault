@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,5 +52,52 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 		if !strings.Contains(string(b), "10001") {
 			t.Fatalf("%s does not contain tweet id", path)
 		}
+	}
+}
+
+func TestBackupCreatesIntegrityCheckedSQLiteCopy(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	page := model.ParsedPage{
+		Users:       []model.User{{ID: "u1", Username: "alice"}},
+		Tweets:      []model.Tweet{{ID: "10001", Text: "backup fixture tweet", AuthorID: "u1", AuthorUsername: "alice"}},
+		Collections: []model.CollectionItem{{TweetID: "10001", CollectionType: "like"}},
+	}
+	if err := st.UpsertPage(ctx, page); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "backup.sqlite")
+	data, err := Backup(ctx, st, output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data["output"] != output {
+		t.Fatalf("backup output = %#v", data)
+	}
+	db, err := sql.Open("sqlite", output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var integrity string
+	if err := db.QueryRowContext(ctx, "PRAGMA integrity_check").Scan(&integrity); err != nil {
+		t.Fatal(err)
+	}
+	if integrity != "ok" {
+		t.Fatalf("integrity = %q", integrity)
+	}
+	var count int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM tweets WHERE id='10001'").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("backup tweet count = %d", count)
+	}
+	if _, err := Backup(ctx, st, output); err == nil {
+		t.Fatal("expected existing backup path to be rejected")
 	}
 }

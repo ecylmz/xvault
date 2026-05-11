@@ -2,7 +2,6 @@ package exporter
 
 import (
 	"context"
-	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -118,16 +117,14 @@ func Backup(ctx context.Context, st *store.Store, output string) (map[string]any
 	if err := os.MkdirAll(filepath.Dir(output), 0o700); err != nil {
 		return nil, err
 	}
-	dst, err := sql.Open("sqlite", output)
-	if err != nil {
+	if _, err := os.Stat(output); err == nil {
+		return nil, fmt.Errorf("backup output already exists: %s", output)
+	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
-	defer dst.Close()
-	srcConn, err := st.DB().Conn(ctx)
-	if err != nil {
+	if _, err := st.DB().ExecContext(ctx, "PRAGMA wal_checkpoint(PASSIVE)"); err != nil {
 		return nil, err
 	}
-	defer srcConn.Close()
 	if _, err := st.DB().ExecContext(ctx, "VACUUM INTO ?", output); err != nil {
 		return nil, err
 	}
