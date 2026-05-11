@@ -59,3 +59,28 @@ INSERT INTO moz_cookies(host,name,value) VALUES('.x.com','auth_token','auth'),('
 		t.Fatalf("cookies = %#v", c)
 	}
 }
+
+func TestResolveChromeFromPatterns(t *testing.T) {
+	dir := t.TempDir()
+	profile := filepath.Join(dir, "Default", "Network")
+	if err := os.MkdirAll(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(profile, "Cookies")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE cookies(host_key TEXT, name TEXT, value TEXT, encrypted_value BLOB);
+INSERT INTO cookies(host_key,name,value) VALUES('.x.com','auth_token','auth'),('.x.com','ct0','csrf'),('.x.com','twid','u=1')`); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	c, err := ResolveChromeFromPatterns(context.Background(), []string{filepath.Join(dir, "*", "Network", "Cookies")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.AuthToken != "auth" || c.CT0 != "csrf" || c.TWID != "u=1" {
+		t.Fatalf("cookies = %#v", c)
+	}
+}
