@@ -224,6 +224,38 @@ func authCmd(st *state) *cobra.Command {
 		}
 		return nil
 	}})
+	var importForce bool
+	importEnvCmd := &cobra.Command{Use: "import-env", RunE: func(cmd *cobra.Command, args []string) error {
+		c := auth.EnvCookies()
+		if c.AuthToken == "" || c.CT0 == "" {
+			return auth.ErrMissing
+		}
+		path := config.Expand(st.cfg.Auth.DotenvPath)
+		if !importForce {
+			if _, err := os.Stat(path); err == nil {
+				return fmt.Errorf("dotenv file already exists at %s; pass --force to overwrite it", path)
+			}
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return err
+		}
+		body := "XVAULT_AUTH_TOKEN=\"" + c.AuthToken + "\"\nXVAULT_CT0=\"" + c.CT0 + "\"\n"
+		if c.TWID != "" {
+			body += "XVAULT_TWID=\"" + c.TWID + "\"\n"
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			return err
+		}
+		data := map[string]any{"dotenv_path": path, "cookies": auth.RedactedStatus(c)}
+		if st.json {
+			writeJSON(os.Stdout, "auth import-env", st.started, data)
+		} else {
+			human(os.Stdout, "imported env cookies to %s", path)
+		}
+		return nil
+	}}
+	importEnvCmd.Flags().BoolVar(&importForce, "force", false, "overwrite existing dotenv file")
+	cmd.AddCommand(importEnvCmd)
 	return cmd
 }
 

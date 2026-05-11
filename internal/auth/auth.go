@@ -128,3 +128,7 @@ func ParseDotenv(path string) (map[string]string, error) {
 	}
 	return out, sc.Err()
 }
+
+func EnvCookies() Cookies {
+	return fromMap(getenv)
+}
