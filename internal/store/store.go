@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -33,6 +35,22 @@ type Checkpoint struct {
 	SourceRunID    string
 	TotalSeen      int
 	Status         string
+}
+
+type SyncRun struct {
+	ID              string
+	CollectionType  string
+	Mode            string
+	Status          string
+	PagesFetched    int
+	TweetsSeen      int
+	TweetsInserted  int
+	TweetsUpdated   int
+	TweetsUnchanged int
+	ErrorsCount     int
+	RateLimitCount  int
+	ErrorCode       string
+	ErrorMessage    string
 }
 
 func Open(path string) (*Store, error) {
@@ -546,6 +564,49 @@ func (s *Store) LoadCheckpoint(ctx context.Context, collectionType string) (Chec
 func (s *Store) ClearCheckpoint(ctx context.Context, collectionType string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM sync_checkpoints WHERE collection_type=?`, collectionType)
 	return err
+}
+
+func (s *Store) StartSyncRun(ctx context.Context, collectionType, mode string) (string, error) {
+	if collectionType == "" {
+		return "", fmt.Errorf("sync run collection type is required")
+	}
+	if mode == "" {
+		mode = "incremental"
+	}
+	id := newRunID()
+	_, err := s.db.ExecContext(ctx, `INSERT INTO sync_runs(id, collection_type, mode, status, started_at) VALUES(?,?,?,?,?)`,
+		id, collectionType, mode, "in_progress", now())
+	return id, err
+}
+
+func (s *Store) FinishSyncRun(ctx context.Context, run SyncRun) error {
+	if run.ID == "" {
+		return fmt.Errorf("sync run id is required")
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE sync_runs SET status=?, finished_at=?, pages_fetched=?, tweets_seen=?, tweets_inserted=?, tweets_updated=?, tweets_unchanged=?, errors_count=?, rate_limit_count=?, error_code=?, error_message=? WHERE id=?`,
+		run.Status, now(), run.PagesFetched, run.TweetsSeen, run.TweetsInserted, run.TweetsUpdated, run.TweetsUnchanged, run.ErrorsCount, run.RateLimitCount, nullString(run.ErrorCode), nullString(run.ErrorMessage), run.ID)
+	return err
+}
+
+func (s *Store) GetSyncRun(ctx context.Context, id string) (SyncRun, error) {
+	var run SyncRun
+	var errorCode, errorMessage sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT id, collection_type, mode, status, pages_fetched, tweets_seen, tweets_inserted, tweets_updated, tweets_unchanged, errors_count, rate_limit_count, error_code, error_message FROM sync_runs WHERE id=?`, id).
+		Scan(&run.ID, &run.CollectionType, &run.Mode, &run.Status, &run.PagesFetched, &run.TweetsSeen, &run.TweetsInserted, &run.TweetsUpdated, &run.TweetsUnchanged, &run.ErrorsCount, &run.RateLimitCount, &errorCode, &errorMessage)
+	if err != nil {
+		return SyncRun{}, err
+	}
+	run.ErrorCode = errorCode.String
+	run.ErrorMessage = errorMessage.String
+	return run, nil
+}
+
+func newRunID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("run-%d", time.Now().UTC().UnixNano())
+	}
+	return fmt.Sprintf("run-%d-%016x", time.Now().UTC().UnixNano(), binary.BigEndian.Uint64(b[:]))
 }
 
 func CanonicalURL(username, id string) string {

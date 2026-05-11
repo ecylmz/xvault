@@ -25,6 +25,7 @@ type Request struct {
 }
 
 type Result struct {
+	RunID                string `json:"run_id,omitempty"`
 	Collection           string `json:"collection"`
 	Mode                 string `json:"mode"`
 	PagesFetched         int    `json:"pages_fetched"`
@@ -53,14 +54,49 @@ func New(c *client.Client, st *store.Store, qids queryids.Cache, dbPath, twid st
 	return &Syncer{client: c, store: st, qids: qids, dbPath: dbPath, userID: cleanTWID(twid), delay: delay}
 }
 
-func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
+func (s *Syncer) Sync(ctx context.Context, req Request) (res Result, err error) {
 	ops, err := s.operations(req)
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Collection: req.Collection, Mode: "incremental", DBPath: s.dbPath}
+	res = Result{Collection: req.Collection, Mode: "incremental", DBPath: s.dbPath}
 	if req.Full {
 		res.Mode = "full"
+	}
+	runCollection := collectionDBValue(req.Collection)
+	runID, err := s.store.StartSyncRun(ctx, runCollection, res.Mode)
+	if err != nil {
+		return Result{}, err
+	}
+	res.RunID = runID
+	defer func() {
+		status := "success"
+		errorsCount := 0
+		errorCode := ""
+		errorMessage := ""
+		if err != nil {
+			status = "failed"
+			errorsCount = 1
+			errorCode = classifySyncError(err)
+			errorMessage = err.Error()
+		} else if res.NextCursor != "" && !res.CheckpointCleared {
+			status = "partial"
+		}
+		_ = s.store.FinishSyncRun(ctx, store.SyncRun{
+			ID:              runID,
+			Status:          status,
+			PagesFetched:    res.PagesFetched,
+			TweetsSeen:      res.TweetsSeen,
+			TweetsInserted:  res.TweetsInserted,
+			TweetsUpdated:   res.TweetsUpdated,
+			TweetsUnchanged: res.TweetsUnchanged,
+			ErrorsCount:     errorsCount,
+			RateLimitCount:  res.RateLimitEvents,
+			ErrorCode:       errorCode,
+			ErrorMessage:    errorMessage,
+		})
+	}()
+	if req.Full {
 		if err := s.store.ClearCheckpoint(ctx, collectionDBValue(req.Collection)); err != nil {
 			return Result{}, err
 		}
@@ -71,7 +107,7 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 	}
 	for _, op := range ops {
 		cursor := ""
-		checkpointType := collectionDBValue(req.Collection)
+		checkpointType := runCollection
 		if !req.Full {
 			cp, ok, err := s.store.LoadCheckpoint(ctx, checkpointType)
 			if err != nil {
@@ -113,6 +149,9 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 				return res, err
 			}
 			page = normalizePageForCollection(page, req.Collection)
+			for i := range page.Collections {
+				page.Collections[i].SourceRunID = runID
+			}
 			for i := range page.Tweets {
 				if page.Tweets[i].RawJSONID == "" {
 					page.Tweets[i].RawJSONID = rawID
@@ -140,7 +179,7 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 			res.NextCursor = cursor
 			if limit > 0 && res.TweetsSeen >= limit {
 				if cursor != "" {
-					if err := s.saveCheckpoint(ctx, checkpointType, cursor, res.TweetsSeen, page); err != nil {
+					if err := s.saveCheckpoint(ctx, checkpointType, runID, cursor, res.TweetsSeen, page); err != nil {
 						return res, err
 					}
 				}
@@ -153,7 +192,7 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 				res.CheckpointCleared = true
 				break
 			}
-			if err := s.saveCheckpoint(ctx, checkpointType, cursor, res.TweetsSeen, page); err != nil {
+			if err := s.saveCheckpoint(ctx, checkpointType, runID, cursor, res.TweetsSeen, page); err != nil {
 				return res, err
 			}
 			if req.MaxPages > 0 && res.PagesFetched >= req.MaxPages {
@@ -171,8 +210,8 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (Result, error) {
 	return res, nil
 }
 
-func (s *Syncer) saveCheckpoint(ctx context.Context, collectionType, cursor string, totalSeen int, page model.ParsedPage) error {
-	cp := store.Checkpoint{CollectionType: collectionType, Cursor: cursor, TotalSeen: totalSeen, Status: "in_progress"}
+func (s *Syncer) saveCheckpoint(ctx context.Context, collectionType, runID, cursor string, totalSeen int, page model.ParsedPage) error {
+	cp := store.Checkpoint{CollectionType: collectionType, Cursor: cursor, SourceRunID: runID, TotalSeen: totalSeen, Status: "in_progress"}
 	for i := len(page.Tweets) - 1; i >= 0; i-- {
 		if page.Tweets[i].ID != "" {
 			cp.LastTweetID = page.Tweets[i].ID
@@ -186,6 +225,23 @@ func (s *Syncer) saveCheckpoint(ctx context.Context, collectionType, cursor stri
 		}
 	}
 	return s.store.SaveCheckpoint(ctx, cp)
+}
+
+func classifySyncError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "rate limited"):
+		return "RATE_LIMITED"
+	case strings.Contains(msg, "http 401"), strings.Contains(msg, "authenticate"):
+		return "AUTH_EXPIRED"
+	case strings.Contains(msg, "http 404"), strings.Contains(msg, "query not found"):
+		return "QUERY_ID_STALE"
+	default:
+		return "SYNC_FAILED"
+	}
 }
 
 func normalizePageForCollection(page model.ParsedPage, collection string) model.ParsedPage {

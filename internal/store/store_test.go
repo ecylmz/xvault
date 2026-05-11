@@ -191,3 +191,38 @@ func TestCheckpointRoundTrip(t *testing.T) {
 		t.Fatalf("expected cleared checkpoint, ok=%v err=%v", ok, err)
 	}
 }
+
+func TestSyncRunLifecycle(t *testing.T) {
+	ctx := context.Background()
+	st, err := Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	id, err := st.StartSyncRun(ctx, "like", "incremental")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id == "" {
+		t.Fatal("empty sync run id")
+	}
+	if err := st.FinishSyncRun(ctx, SyncRun{
+		ID:             id,
+		Status:         "partial",
+		PagesFetched:   2,
+		TweetsSeen:     10,
+		TweetsInserted: 9,
+		RateLimitCount: 1,
+		ErrorCode:      "RATE_LIMITED",
+		ErrorMessage:   "rate limited",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetSyncRun(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "partial" || got.PagesFetched != 2 || got.TweetsSeen != 10 || got.ErrorCode != "RATE_LIMITED" {
+		t.Fatalf("sync run = %#v", got)
+	}
+}

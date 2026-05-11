@@ -40,12 +40,29 @@ func TestSyncLikesWithReplayServer(t *testing.T) {
 	if result.PagesFetched != 1 || result.TweetsSeen != 1 {
 		t.Fatalf("result = %#v", result)
 	}
+	if result.RunID == "" {
+		t.Fatalf("missing run id: %#v", result)
+	}
+	run, err := st.GetSyncRun(ctx, result.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != "success" || run.PagesFetched != 1 || run.TweetsSeen != 1 {
+		t.Fatalf("sync run = %#v", run)
+	}
 	results, err := st.Search(ctx, "fixture", "likes", "", "", 10, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(results) != 1 || results[0].AuthorUsername != "alice" {
 		t.Fatalf("search results = %#v", results)
+	}
+	var sourceRunID string
+	if err := st.DB().QueryRowContext(ctx, `SELECT source_run_id FROM collections WHERE tweet_id='10001' AND collection_type='like'`).Scan(&sourceRunID); err != nil {
+		t.Fatal(err)
+	}
+	if sourceRunID != result.RunID {
+		t.Fatalf("source_run_id = %q, want %q", sourceRunID, result.RunID)
 	}
 }
 
@@ -110,6 +127,13 @@ func TestSyncPersistsAndResumesCheckpoint(t *testing.T) {
 	}
 	if first.NextCursor != "CURSOR-1" || first.CheckpointCleared {
 		t.Fatalf("first result = %#v", first)
+	}
+	run, err := st.GetSyncRun(ctx, first.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != "partial" || run.PagesFetched != 1 {
+		t.Fatalf("first run = %#v", run)
 	}
 	if cp, ok, err := st.LoadCheckpoint(ctx, "like"); err != nil || !ok || cp.Cursor != "CURSOR-1" {
 		t.Fatalf("checkpoint = %#v ok=%v err=%v", cp, ok, err)
