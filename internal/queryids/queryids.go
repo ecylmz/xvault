@@ -35,6 +35,7 @@ var fallback = map[string]string{
 	"UserTweetsAndReplies":   "3YJONShMAajim63A8iF-sw",
 	"TweetDetail":            "_i0BBmP_dK_ZLFa2Y-ei9Q",
 	"HomeLatestTimeline":     "PyccKQwFZpSmD1revPllaA",
+	"Viewer":                 "_8ClT24oZ8tpylf_OSuNdg",
 }
 
 func Load(path string) Cache {

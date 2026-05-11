@@ -3,9 +3,9 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -200,18 +200,39 @@ func authCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		req, _ := http.NewRequestWithContext(cmd.Context(), http.MethodGet, "https://x.com/home", nil)
-		req.Header = client.BuildHeaders(c)
-		resp, err := http.DefaultClient.Do(req)
+		x := client.New(client.Options{Auth: c})
+		raw, status, err := x.FetchGraphQL(cmd.Context(), client.Operation{
+			Name:    "Viewer",
+			QueryID: queryids.Load("").QueryID("Viewer"),
+			Variables: map[string]any{
+				"withCommunitiesMemberships": true,
+				"withSubscribedTab":          true,
+				"withCommunitiesCreation":    true,
+			},
+			FieldToggles: defaultFieldTogglesForApp(),
+		})
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
-		data := map[string]any{"source": src.Name, "http_status": resp.StatusCode, "authenticated": resp.StatusCode < 400}
+		var body struct {
+			Errors []struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+			} `json:"errors"`
+		}
+		if err := json.Unmarshal(raw, &body); err != nil {
+			return err
+		}
+		for _, gqlErr := range body.Errors {
+			if gqlErr.Code == 32 || gqlErr.Code == 215 || strings.Contains(strings.ToLower(gqlErr.Message), "not authenticated") {
+				return errCode("AUTH_EXPIRED", "authentication cookies were rejected by X")
+			}
+		}
+		data := map[string]any{"source": src.Name, "http_status": status, "authenticated": status >= 200 && status < 300}
 		if st.json {
 			writeJSON(os.Stdout, "auth test", st.started, data)
 		} else {
-			human(os.Stdout, "auth test HTTP %d", resp.StatusCode)
+			human(os.Stdout, "auth test HTTP %d", status)
 		}
 		return nil
 	}})
@@ -828,6 +849,9 @@ func classifyExit(err error) int {
 	if strings.Contains(err.Error(), "HTTP 401") || strings.Contains(err.Error(), "Could not authenticate") {
 		return 4
 	}
+	if coded, ok := err.(codedError); ok && coded.code == "AUTH_EXPIRED" {
+		return 4
+	}
 	if strings.Contains(err.Error(), "HTTP 404") || strings.Contains(err.Error(), "Query not found") {
 		return 7
 	}
@@ -844,11 +868,11 @@ func classifyCode(err error) string {
 	if strings.Contains(err.Error(), "HTTP 401") || strings.Contains(err.Error(), "Could not authenticate") {
 		return "AUTH_EXPIRED"
 	}
+	if coded, ok := err.(codedError); ok && coded.code != "" {
+		return coded.code
+	}
 	if strings.Contains(err.Error(), "HTTP 404") || strings.Contains(err.Error(), "Query not found") {
 		return "QUERY_ID_STALE"
-	}
-	if coded, ok := err.(codedError); ok {
-		return coded.code
 	}
 	if strings.Contains(err.Error(), "rate limited") {
 		return "RATE_LIMITED"
