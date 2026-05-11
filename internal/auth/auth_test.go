@@ -40,6 +40,14 @@ func TestRedactSecret(t *testing.T) {
 	}
 }
 
+func TestDotenvBody(t *testing.T) {
+	body := DotenvBody(Cookies{AuthToken: "auth", CT0: "csrf", TWID: "u=1"})
+	want := "XVAULT_AUTH_TOKEN=\"auth\"\nXVAULT_CT0=\"csrf\"\nXVAULT_TWID=\"u=1\"\n"
+	if body != want {
+		t.Fatalf("dotenv body = %q", body)
+	}
+}
+
 func TestResolveFirefoxFromPatterns(t *testing.T) {
 	dir := t.TempDir()
 	profile := filepath.Join(dir, "profile.default")

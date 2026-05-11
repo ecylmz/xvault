@@ -62,6 +62,25 @@ func Resolve(ctx context.Context, cfg config.Config) (Cookies, Source, error) {
 	return Cookies{}, Source{}, ErrMissing
 }
 
+func ResolveBrowser(ctx context.Context, source string) (Cookies, Source, error) {
+	c, err := resolveBrowserCookies(ctx, source)
+	if err != nil {
+		return Cookies{}, Source{}, err
+	}
+	if c.AuthToken == "" || c.CT0 == "" {
+		return Cookies{}, Source{}, ErrMissing
+	}
+	return c, Source{Name: source}, nil
+}
+
+func DotenvBody(c Cookies) string {
+	body := "XVAULT_AUTH_TOKEN=\"" + c.AuthToken + "\"\nXVAULT_CT0=\"" + c.CT0 + "\"\n"
+	if c.TWID != "" {
+		body += "XVAULT_TWID=\"" + c.TWID + "\"\n"
+	}
+	return body
+}
+
 func Status(ctx context.Context, cfg config.Config) map[string]string {
 	c, _, _ := Resolve(ctx, cfg)
 	status := map[string]string{"auth_token": "missing", "ct0": "missing", "twid": "missing"}

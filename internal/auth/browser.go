@@ -18,7 +18,12 @@ func BrowserSources() []BrowserCookieSource {
 }
 
 func resolveBrowserCookies(ctx context.Context, name string) (Cookies, error) {
-	_ = ctx
-	_ = name
-	return Cookies{}, ErrMissing
+	switch name {
+	case "firefox":
+		return ResolveFirefox(ctx)
+	case "chrome", "chrome_linux", "chrome_macos":
+		return ResolveChrome(ctx)
+	default:
+		return Cookies{}, ErrMissing
+	}
 }

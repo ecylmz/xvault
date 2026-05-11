@@ -254,13 +254,11 @@ func authCmd(st *state) *cobra.Command {
 		return nil
 	}})
 	var importForce bool
-	importEnvCmd := &cobra.Command{Use: "import-env", RunE: func(cmd *cobra.Command, args []string) error {
-		c := auth.EnvCookies()
+	writeDotenv := func(path string, c auth.Cookies, force bool) error {
 		if c.AuthToken == "" || c.CT0 == "" {
 			return auth.ErrMissing
 		}
-		path := config.Expand(st.cfg.Auth.DotenvPath)
-		if !importForce {
+		if !force {
 			if _, err := os.Stat(path); err == nil {
 				return fmt.Errorf("dotenv file already exists at %s; pass --force to overwrite it", path)
 			}
@@ -268,11 +266,12 @@ func authCmd(st *state) *cobra.Command {
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return err
 		}
-		body := "XVAULT_AUTH_TOKEN=\"" + c.AuthToken + "\"\nXVAULT_CT0=\"" + c.CT0 + "\"\n"
-		if c.TWID != "" {
-			body += "XVAULT_TWID=\"" + c.TWID + "\"\n"
-		}
-		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		return os.WriteFile(path, []byte(auth.DotenvBody(c)), 0o600)
+	}
+	importEnvCmd := &cobra.Command{Use: "import-env", RunE: func(cmd *cobra.Command, args []string) error {
+		c := auth.EnvCookies()
+		path := config.Expand(st.cfg.Auth.DotenvPath)
+		if err := writeDotenv(path, c, importForce); err != nil {
 			return err
 		}
 		data := map[string]any{"dotenv_path": path, "cookies": auth.RedactedStatus(c)}
@@ -285,6 +284,27 @@ func authCmd(st *state) *cobra.Command {
 	}}
 	importEnvCmd.Flags().BoolVar(&importForce, "force", false, "overwrite existing dotenv file")
 	cmd.AddCommand(importEnvCmd)
+	var importBrowserSource string
+	importBrowserCmd := &cobra.Command{Use: "import-browser", RunE: func(cmd *cobra.Command, args []string) error {
+		c, src, err := auth.ResolveBrowser(cmd.Context(), importBrowserSource)
+		if err != nil {
+			return err
+		}
+		path := config.Expand(st.cfg.Auth.DotenvPath)
+		if err := writeDotenv(path, c, importForce); err != nil {
+			return err
+		}
+		data := map[string]any{"dotenv_path": path, "source": src.Name, "cookies": auth.RedactedStatus(c)}
+		if st.json {
+			writeJSON(os.Stdout, "auth import-browser", st.started, data)
+		} else {
+			human(os.Stdout, "imported %s cookies to %s", src.Name, path)
+		}
+		return nil
+	}}
+	importBrowserCmd.Flags().StringVar(&importBrowserSource, "source", "firefox", "browser source: firefox or chrome")
+	importBrowserCmd.Flags().BoolVar(&importForce, "force", false, "overwrite existing dotenv file")
+	cmd.AddCommand(importBrowserCmd)
 	return cmd
 }
 

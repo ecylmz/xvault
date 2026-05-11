@@ -45,3 +45,10 @@ Use `--auth-source` to test or run with a specific source without editing config
 xvault --auth-source firefox auth test --json
 xvault --auth-source chrome sync bookmarks --count 100 --max-pages 2 --json
 ```
+
+If browser extraction succeeds, write those cookies into the dotenv file:
+
+```bash
+xvault auth import-browser --source firefox --force --json
+xvault auth import-browser --source chrome --force --json
+```

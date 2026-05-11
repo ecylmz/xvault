@@ -20,6 +20,13 @@ xvault refresh-ids --json
 
 If sync still fails, capture only redacted error output. Do not share cookies or raw payloads.
 
+If the dotenv file is stale but browser cookies are available locally, try:
+
+```bash
+xvault auth import-browser --source firefox --force --json
+xvault auth import-browser --source chrome --force --json
+```
+
 ## Search Returns Nothing
 
 Run:
