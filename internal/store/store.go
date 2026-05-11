@@ -669,6 +669,12 @@ ORDER BY 2`)
 	return out, rows.Err()
 }
 
+func (s *Store) CollectionCount(ctx context.Context, collection string) (int64, error) {
+	var count int64
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT tweet_id) FROM collections WHERE collection_type=?`, normalizeCollection(collection)).Scan(&count)
+	return count, err
+}
+
 func (s *Store) Vacuum(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE); VACUUM")
 	return err

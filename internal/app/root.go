@@ -127,6 +127,7 @@ func addCommands(root *cobra.Command, st *state) {
 	}})
 	root.AddCommand(statusCmd(st), doctorCmd(st), statsCmd(st), authCmd(st), configCmd(st), syncCmd(st), searchCmd(st), showCmd(st), showURLCmd(st), openCmd(st), threadCmd(st), conversationCmd(st), exportCmd(st), dbCmd(st), backupCmd(st), vacuumCmd(st), serviceCmd(st), refreshIDsCmd(st))
 	root.AddCommand(bookmarksCmd(st))
+	root.AddCommand(countCmd(st))
 }
 
 func statusCmd(st *state) *cobra.Command {
@@ -616,6 +617,27 @@ func bookmarksCmd(st *state) *cobra.Command {
 		return nil
 	}})
 	return cmd
+}
+
+func countCmd(st *state) *cobra.Command {
+	return &cobra.Command{Use: "count COLLECTION", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		count, err := s.CollectionCount(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		data := map[string]any{"collection": args[0], "count": count}
+		if st.json {
+			writeJSON(os.Stdout, "count", st.started, data)
+		} else {
+			human(os.Stdout, "%d", count)
+		}
+		return nil
+	}}
 }
 
 func showCmd(st *state) *cobra.Command {
