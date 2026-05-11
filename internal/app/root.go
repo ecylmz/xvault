@@ -18,6 +18,7 @@ import (
 	"github.com/ecylmz/xvault/internal/client"
 	"github.com/ecylmz/xvault/internal/config"
 	"github.com/ecylmz/xvault/internal/exporter"
+	"github.com/ecylmz/xvault/internal/parser"
 	"github.com/ecylmz/xvault/internal/queryids"
 	"github.com/ecylmz/xvault/internal/store"
 	"github.com/ecylmz/xvault/internal/syncer"
@@ -454,6 +455,7 @@ func threadCmd(st *state) *cobra.Command {
 			return err
 		}
 		defer s.Close()
+		_ = expandTweetDetail(cmd.Context(), st, s, args[0], mode)
 		data, err := s.Thread(cmd.Context(), args[0], mode, limit)
 		if err != nil {
 			return err
@@ -478,6 +480,7 @@ func conversationCmd(st *state) *cobra.Command {
 			return err
 		}
 		defer s.Close()
+		_ = expandTweetDetail(cmd.Context(), st, s, args[0], "conversation")
 		data, err := s.Thread(cmd.Context(), args[0], "conversation", limit)
 		if err != nil {
 			return err
@@ -491,6 +494,50 @@ func conversationCmd(st *state) *cobra.Command {
 	}}
 	cmd.Flags().IntVar(&limit, "limit", 500, "maximum tweets")
 	return cmd
+}
+
+func expandTweetDetail(ctx context.Context, st *state, s *store.Store, tweetID, collection string) error {
+	cookies, _, err := auth.Resolve(ctx, st.cfg)
+	if err != nil {
+		return err
+	}
+	qids := queryids.Load("")
+	x := client.New(client.Options{Auth: cookies})
+	raw, _, err := x.FetchGraphQL(ctx, client.Operation{
+		Name:    "TweetDetail",
+		QueryID: qids.QueryID("TweetDetail"),
+		Variables: map[string]any{
+			"focalTweetId": tweetID, "includePromotedContent": true,
+			"withCommunity": false, "withQuickPromoteEligibilityTweetFields": true,
+			"withBirdwatchNotes": false, "withVoice": false,
+		},
+		FieldToggles: defaultFieldTogglesForApp(),
+	})
+	if err != nil {
+		return err
+	}
+	rawID, err := s.SaveRaw(ctx, "graphql", "TweetDetail", raw)
+	if err != nil {
+		return err
+	}
+	page, err := parser.Timeline(raw, collection, "", "", rawID)
+	if err != nil {
+		return err
+	}
+	return s.UpsertPage(ctx, page)
+}
+
+func defaultFieldTogglesForApp() map[string]any {
+	return map[string]any{
+		"withPayments":                false,
+		"withAuxiliaryUserLabels":     false,
+		"withArticleRichContentState": false,
+		"withArticlePlainText":        false,
+		"withArticleSummaryText":      false,
+		"withArticleVoiceOver":        false,
+		"withGrokAnalyze":             false,
+		"withDisallowedReplyControls": false,
+	}
 }
 
 func exportCmd(st *state) *cobra.Command {
