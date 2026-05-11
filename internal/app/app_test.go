@@ -61,3 +61,14 @@ func TestSyncCountForCollectionUsesConfigDefaults(t *testing.T) {
 		t.Fatalf("flag all count=%d all=%v", count, all)
 	}
 }
+
+func TestInvokedCommandKeepsBooleanFlagsFromEatingCommands(t *testing.T) {
+	got := invokedCommand([]string{"search", "--recent", "--source", "bookmarks", "--json"})
+	if got != "search" {
+		t.Fatalf("recent command = %q", got)
+	}
+	got = invokedCommand([]string{"auth", "import-browser", "--force", "--source", "chrome", "--json"})
+	if got != "auth import-browser" {
+		t.Fatalf("force command = %q", got)
+	}
+}

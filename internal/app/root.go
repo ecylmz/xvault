@@ -1181,7 +1181,7 @@ func invokedCommand(args []string) string {
 			continue
 		}
 		if strings.HasPrefix(arg, "-") {
-			if !strings.Contains(arg, "=") && arg != "--json" && arg != "--quiet" && arg != "--verbose" && arg != "--no-color" && arg != "--all" && arg != "--full" && arg != "--with-threads" && arg != "--has-media" && arg != "--has-link" && arg != "--pretty" {
+			if !strings.Contains(arg, "=") && !boolFlag(arg) {
 				skipNext = true
 			}
 			continue
@@ -1192,6 +1192,15 @@ func invokedCommand(args []string) string {
 		return "xvault"
 	}
 	return strings.Join(parts, " ")
+}
+
+func boolFlag(arg string) bool {
+	switch arg {
+	case "--json", "--quiet", "--verbose", "--no-color", "--all", "--full", "--with-threads", "--has-media", "--has-link", "--pretty", "--force", "--user", "--recent":
+		return true
+	default:
+		return false
+	}
 }
 
 type codedError struct{ code, message string }
