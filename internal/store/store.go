@@ -442,11 +442,100 @@ FROM tweets t LEFT JOIN users u ON u.id=t.author_id WHERE `+where+` ORDER BY COA
 		return nil, err
 	}
 	threadID := threadType + ":" + focalID + ":" + mode
+	isComplete := len(items) < limit
+	if err := s.UpsertThread(ctx, ThreadRecord{
+		ID:             threadID,
+		ConversationID: conversationID,
+		RootTweetID:    conversationID,
+		FocalTweetID:   focalID,
+		AuthorID:       authorID,
+		ThreadType:     threadType,
+		Mode:           mode,
+		ExpansionLimit: limit,
+		TweetCount:     len(items),
+		IsComplete:     isComplete,
+		Tweets:         threadRecordTweets(items),
+	}); err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"thread_id": threadID, "thread_type": threadType, "mode": mode, "focal_tweet_id": focalID,
 		"conversation_id": conversationID, "expansion_limit": limit, "tweet_count": len(items),
-		"is_complete": len(items) < limit, "tweets": items,
+		"is_complete": isComplete, "tweets": items,
 	}, nil
+}
+
+type ThreadRecord struct {
+	ID             string
+	ConversationID string
+	RootTweetID    string
+	FocalTweetID   string
+	AuthorID       string
+	ThreadType     string
+	Mode           string
+	ExpansionLimit int
+	TweetCount     int
+	IsComplete     bool
+	SourceRunID    string
+	Tweets         []ThreadTweet
+}
+
+type ThreadTweet struct {
+	TweetID  string
+	Depth    int
+	Position int
+	Role     string
+}
+
+func (s *Store) UpsertThread(ctx context.Context, rec ThreadRecord) error {
+	if rec.ID == "" || rec.ConversationID == "" || rec.FocalTweetID == "" || rec.ThreadType == "" || rec.Mode == "" {
+		return fmt.Errorf("thread record is missing required fields")
+	}
+	if rec.RootTweetID == "" {
+		rec.RootTweetID = rec.ConversationID
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	_, err = tx.ExecContext(ctx, `INSERT INTO threads(id, conversation_id, root_tweet_id, focal_tweet_id, focal_tweet_id_key, author_id, thread_type, mode, expansion_limit, tweet_count, is_complete, fetched_at, source_run_id)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT(thread_type, focal_tweet_id_key, mode) DO UPDATE SET conversation_id=excluded.conversation_id, root_tweet_id=excluded.root_tweet_id, author_id=excluded.author_id, expansion_limit=excluded.expansion_limit, tweet_count=excluded.tweet_count, is_complete=excluded.is_complete, fetched_at=excluded.fetched_at, source_run_id=excluded.source_run_id`,
+		rec.ID, rec.ConversationID, rec.RootTweetID, rec.FocalTweetID, rec.FocalTweetID, rec.AuthorID, rec.ThreadType, rec.Mode, rec.ExpansionLimit, rec.TweetCount, boolInt(rec.IsComplete), now(), nullString(rec.SourceRunID))
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM thread_tweets WHERE thread_id=?`, rec.ID); err != nil {
+		return err
+	}
+	for i, tw := range rec.Tweets {
+		if tw.TweetID == "" {
+			continue
+		}
+		position := tw.Position
+		if position == 0 {
+			position = i + 1
+		}
+		role := tw.Role
+		if role == "" {
+			role = "member"
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO thread_tweets(thread_id, tweet_id, depth, position, role) VALUES(?,?,?,?,?)`, rec.ID, tw.TweetID, tw.Depth, position, role); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func threadRecordTweets(items []map[string]any) []ThreadTweet {
+	out := make([]ThreadTweet, 0, len(items))
+	for i, item := range items {
+		id, _ := item["tweet_id"].(string)
+		role, _ := item["role"].(string)
+		out = append(out, ThreadTweet{TweetID: id, Position: i + 1, Role: role})
+	}
+	return out
 }
 
 func (s *Store) collections(ctx context.Context, tweetID string) ([]string, string) {

@@ -109,6 +109,19 @@ func TestShowByURLThreadAndVacuum(t *testing.T) {
 	if thread["tweet_count"] != 2 {
 		t.Fatalf("thread tweet_count = %#v", thread["tweet_count"])
 	}
+	var threadCount, memberCount int
+	if err := s.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM threads WHERE id='thread:10001:thread' AND tweet_count=2 AND is_complete=1`).Scan(&threadCount); err != nil {
+		t.Fatal(err)
+	}
+	if threadCount != 1 {
+		t.Fatalf("persisted thread count = %d", threadCount)
+	}
+	if err := s.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM thread_tweets WHERE thread_id='thread:10001:thread'`).Scan(&memberCount); err != nil {
+		t.Fatal(err)
+	}
+	if memberCount != 2 {
+		t.Fatalf("persisted thread members = %d", memberCount)
+	}
 	if err := s.Vacuum(ctx); err != nil {
 		t.Fatal(err)
 	}
