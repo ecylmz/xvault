@@ -770,6 +770,23 @@ FROM sync_runs WHERE `+strings.Join(where, " AND ")+` ORDER BY started_at DESC, 
 	return out, rows.Err()
 }
 
+func (s *Store) SanitizeSyncRunErrors(ctx context.Context) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE sync_runs
+SET error_message = CASE error_code
+  WHEN 'AUTH_EXPIRED' THEN 'authentication cookies were rejected by X'
+  WHEN 'RATE_LIMITED' THEN 'rate limited by X'
+  WHEN 'QUERY_ID_STALE' THEN 'X GraphQL query ID appears stale'
+  ELSE 'sync failed'
+END
+WHERE error_message IS NOT NULL AND error_message <> '' AND (
+  instr(error_message, '{') > 0 OR instr(error_message, 'auth_token') > 0 OR instr(error_message, 'ct0') > 0 OR instr(error_message, 'Cookie') > 0 OR length(error_message) > 160
+)`)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 func newRunID() string {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {

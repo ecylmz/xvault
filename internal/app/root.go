@@ -464,6 +464,24 @@ func syncCmd(st *state) *cobra.Command {
 		}
 		return nil
 	}})
+	cmd.AddCommand(&cobra.Command{Use: "sanitize-runs", RunE: func(c *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		updated, err := s.SanitizeSyncRunErrors(c.Context())
+		if err != nil {
+			return err
+		}
+		data := map[string]any{"updated": updated}
+		if st.json {
+			writeJSON(os.Stdout, "sync sanitize-runs", st.started, data)
+		} else {
+			human(os.Stdout, "sanitized %d sync run(s)", updated)
+		}
+		return nil
+	}})
 	for _, name := range []string{"likes", "bookmarks", "tweets", "reposts", "replies", "posts", "feed"} {
 		n := name
 		cmd.AddCommand(&cobra.Command{Use: n, RunE: func(c *cobra.Command, args []string) error {

@@ -259,4 +259,21 @@ func TestSyncRunLifecycle(t *testing.T) {
 	if len(runs) != 1 || runs[0].ID != id || runs[0].FinishedAt == "" || runs[0].StartedAt == "" {
 		t.Fatalf("sync runs = %#v", runs)
 	}
+	if err := st.FinishSyncRun(ctx, SyncRun{ID: id, Status: "failed", ErrorCode: "AUTH_EXPIRED", ErrorMessage: `{"errors":[{"message":"Could not authenticate you"}]}`}); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := st.SanitizeSyncRunErrors(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated != 1 {
+		t.Fatalf("updated = %d", updated)
+	}
+	got, err = st.GetSyncRun(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ErrorMessage != "authentication cookies were rejected by X" {
+		t.Fatalf("sanitized run = %#v", got)
+	}
 }
