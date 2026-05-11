@@ -26,7 +26,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.1.0-dev"
+var (
+	version = "0.1.0-dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
 
 type state struct {
 	json    bool
@@ -92,11 +96,11 @@ func Execute(args []string) int {
 
 func addCommands(root *cobra.Command, st *state) {
 	root.AddCommand(&cobra.Command{Use: "version", RunE: func(cmd *cobra.Command, args []string) error {
-		data := map[string]any{"version": version, "go": runtime.Version(), "os": runtime.GOOS, "arch": runtime.GOARCH}
+		data := map[string]any{"version": version, "commit": commit, "date": date, "go": runtime.Version(), "os": runtime.GOOS, "arch": runtime.GOARCH}
 		if st.json {
 			writeJSON(os.Stdout, "version", st.started, data)
 		} else {
-			human(os.Stdout, "xvault %s (%s/%s)", version, runtime.GOOS, runtime.GOARCH)
+			human(os.Stdout, "xvault %s %s (%s/%s)", version, commit, runtime.GOOS, runtime.GOARCH)
 		}
 		return nil
 	}})
