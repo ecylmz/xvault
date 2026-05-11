@@ -4,7 +4,7 @@
 
 The current implementation is an early v1 track focused on:
 
-- cookie-based auth from environment or `~/.config/xvault/.env`
+- cookie-based auth from environment, `~/.config/xvault/.env`, Firefox, or Chrome/Chromium profiles
 - `sync likes` and `sync bookmarks` against X web GraphQL endpoints
 - local SQLite storage and FTS search
 - `show`, `stats`, `doctor`, `db`, `backup`, and export commands
@@ -30,6 +30,8 @@ XVAULT_TWID="..."
 ```
 
 TweetHoarder-compatible `TWITTER_AUTH_TOKEN`, `TWITTER_CT0`, and `TWITTER_TWID` aliases are also accepted.
+
+Browser extraction is best-effort. Firefox cookies can be read from the profile database. Chrome/Chromium plaintext cookies are supported, and macOS encrypted `v10` cookies are decrypted through the local Safe Storage Keychain item when macOS permits access.
 
 ## Build
 

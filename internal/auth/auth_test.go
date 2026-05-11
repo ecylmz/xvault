@@ -1,7 +1,12 @@
 package auth
 
 import (
+	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/pbkdf2"
+	"crypto/sha1"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -83,4 +88,33 @@ INSERT INTO cookies(host_key,name,value) VALUES('.x.com','auth_token','auth'),('
 	if c.AuthToken != "auth" || c.CT0 != "csrf" || c.TWID != "u=1" {
 		t.Fatalf("cookies = %#v", c)
 	}
+}
+
+func TestDecryptChromeCookieValueWithPassword(t *testing.T) {
+	encrypted := encryptChromeCookieValueForTest(t, "secret-cookie", "safe-storage-password")
+	got, ok := decryptChromeCookieValueWithPassword(encrypted, "safe-storage-password")
+	if !ok || got != "secret-cookie" {
+		t.Fatalf("decrypted = %q ok=%v", got, ok)
+	}
+	if got, ok := decryptChromeCookieValueWithPassword(encrypted, "wrong-password"); ok || got != "" {
+		t.Fatalf("wrong password decrypted = %q ok=%v", got, ok)
+	}
+}
+
+func encryptChromeCookieValueForTest(t *testing.T, value, password string) []byte {
+	t.Helper()
+	key, err := pbkdf2.Key(sha1.New, password, []byte("saltysalt"), 1003, 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	padding := block.BlockSize() - len(value)%block.BlockSize()
+	plain := append([]byte(value), bytes.Repeat([]byte{byte(padding)}, padding)...)
+	out := make([]byte, len(plain))
+	iv := bytes.Repeat([]byte(" "), block.BlockSize())
+	cipher.NewCBCEncrypter(block, iv).CryptBlocks(out, plain)
+	return append([]byte("v10"), out...)
 }

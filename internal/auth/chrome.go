@@ -1,7 +1,12 @@
 package auth
 
 import (
+	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/pbkdf2"
+	"crypto/sha1"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -68,7 +73,7 @@ func readChromeCookies(ctx context.Context, path string) (Cookies, error) {
 		return Cookies{}, err
 	}
 	defer db.Close()
-	rows, err := db.QueryContext(ctx, `SELECT name, value FROM cookies WHERE (host_key LIKE '%.x.com' OR host_key = 'x.com' OR host_key LIKE '%.twitter.com' OR host_key = 'twitter.com') AND name IN ('auth_token','ct0','twid') AND value <> ''`)
+	rows, err := db.QueryContext(ctx, `SELECT name, value, encrypted_value FROM cookies WHERE (host_key LIKE '%.x.com' OR host_key = 'x.com' OR host_key LIKE '%.twitter.com' OR host_key = 'twitter.com') AND name IN ('auth_token','ct0','twid')`)
 	if err != nil {
 		return Cookies{}, err
 	}
@@ -76,8 +81,17 @@ func readChromeCookies(ctx context.Context, path string) (Cookies, error) {
 	values := map[string]string{}
 	for rows.Next() {
 		var name, value string
-		if err := rows.Scan(&name, &value); err != nil {
+		var encrypted []byte
+		if err := rows.Scan(&name, &value, &encrypted); err != nil {
 			return Cookies{}, err
+		}
+		if value == "" {
+			if decrypted, ok := decryptChromeCookieValue(ctx, encrypted); ok {
+				value = decrypted
+			}
+		}
+		if value == "" {
+			continue
 		}
 		values[name] = value
 	}
@@ -85,4 +99,35 @@ func readChromeCookies(ctx context.Context, path string) (Cookies, error) {
 		return Cookies{}, err
 	}
 	return Cookies{AuthToken: values["auth_token"], CT0: values["ct0"], TWID: values["twid"]}, nil
+}
+
+func decryptChromeCookieValueWithPassword(encrypted []byte, password string) (string, bool) {
+	if len(encrypted) <= 3 || password == "" || !bytes.HasPrefix(encrypted, []byte("v10")) {
+		return "", false
+	}
+	key, err := pbkdf2.Key(sha1.New, password, []byte("saltysalt"), 1003, 16)
+	if err != nil {
+		return "", false
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", false
+	}
+	ciphertext := encrypted[3:]
+	if len(ciphertext) == 0 || len(ciphertext)%block.BlockSize() != 0 {
+		return "", false
+	}
+	plain := make([]byte, len(ciphertext))
+	iv := bytes.Repeat([]byte(" "), block.BlockSize())
+	cipher.NewCBCDecrypter(block, iv).CryptBlocks(plain, ciphertext)
+	padding := int(plain[len(plain)-1])
+	if padding <= 0 || padding > block.BlockSize() || padding > len(plain) {
+		return "", false
+	}
+	for _, b := range plain[len(plain)-padding:] {
+		if int(b) != padding {
+			return "", false
+		}
+	}
+	return string(plain[:len(plain)-padding]), true
 }

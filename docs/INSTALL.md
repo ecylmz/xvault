@@ -21,3 +21,20 @@ docker run --rm \
 ```
 
 Do not bake `.env` or cookies into an image.
+
+## Authentication
+
+The primary setup path is a private dotenv file:
+
+```bash
+mkdir -p ~/.config/xvault
+chmod 700 ~/.config/xvault
+cat > ~/.config/xvault/.env <<'EOF'
+XVAULT_AUTH_TOKEN="..."
+XVAULT_CT0="..."
+XVAULT_TWID="..."
+EOF
+chmod 600 ~/.config/xvault/.env
+```
+
+`xvault` also attempts best-effort browser extraction from Firefox and Chrome/Chromium. On macOS, Chrome/Chromium encrypted `v10` cookies require access to the browser Safe Storage item in Keychain.
