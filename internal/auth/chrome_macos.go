@@ -6,6 +6,7 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 func ResolveChromeMacOS(ctx context.Context) (Cookies, error) {
@@ -22,7 +23,9 @@ func decryptChromeCookieValue(ctx context.Context, encrypted []byte) (string, bo
 
 func chromeSafeStoragePassword(ctx context.Context) (string, bool) {
 	for _, service := range []string{"Chrome Safe Storage", "Chromium Safe Storage"} {
-		out, err := exec.CommandContext(ctx, "security", "find-generic-password", "-w", "-s", service).Output()
+		cmdCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		out, err := exec.CommandContext(cmdCtx, "security", "find-generic-password", "-w", "-s", service).Output()
+		cancel()
 		if err != nil {
 			continue
 		}

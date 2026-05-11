@@ -35,6 +35,7 @@ type state struct {
 	config  string
 	db      string
 	profile string
+	authSrc []string
 	noColor bool
 	cfg     config.Config
 	cfgPath string
@@ -57,6 +58,9 @@ func Execute(args []string) int {
 			if st.db != "" {
 				st.cfg.Database.Path = st.db
 			}
+			if len(st.authSrc) > 0 {
+				st.cfg.Auth.Sources = st.authSrc
+			}
 			if st.cfg.Agent.JSONDefault {
 				st.json = true
 			}
@@ -66,6 +70,7 @@ func Execute(args []string) int {
 	root.PersistentFlags().BoolVar(&st.json, "json", false, "emit a single JSON object")
 	root.PersistentFlags().StringVar(&st.config, "config", "", "config file path")
 	root.PersistentFlags().StringVar(&st.db, "db", "", "SQLite database path")
+	root.PersistentFlags().StringSliceVar(&st.authSrc, "auth-source", nil, "override auth source order (repeat or comma-separate: env,dotenv,firefox,chrome)")
 	root.PersistentFlags().StringVar(&st.profile, "profile", "", "profile name")
 	root.PersistentFlags().BoolVar(&st.quiet, "quiet", false, "reduce human output")
 	root.PersistentFlags().BoolVar(&st.verbose, "verbose", false, "increase diagnostics")
