@@ -64,6 +64,7 @@ xvault sync bookmarks --count 100 --max-pages 2 --json
 xvault search "query" --source bookmarks --limit 10 --json
 xvault show TWEET_ID --json
 xvault export json --collection all --output archive.json --json
+xvault export json --collection bookmarks --folder Research --output research-bookmarks.json --json
 xvault export markdown --collection all --output exports/markdown --json
 xvault export csv --collection all --output archive.csv --json
 xvault export html --collection all --output archive.html --json

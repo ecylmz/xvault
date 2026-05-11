@@ -16,11 +16,15 @@ import (
 )
 
 func JSON(ctx context.Context, st *store.Store, collection, output string, pretty bool) (map[string]any, error) {
-	results, err := st.Search(ctx, "", collection, "", "", 100000, 0)
+	return JSONWithFolder(ctx, st, collection, "", output, pretty)
+}
+
+func JSONWithFolder(ctx context.Context, st *store.Store, collection, folder, output string, pretty bool) (map[string]any, error) {
+	results, err := exportRows(ctx, st, collection, folder)
 	if err != nil {
 		return nil, err
 	}
-	doc := map[string]any{"schema_version": 1, "exported_at": time.Now().UTC().Format(time.RFC3339), "collection": collection, "count": len(results), "tweets": results}
+	doc := map[string]any{"schema_version": 1, "exported_at": time.Now().UTC().Format(time.RFC3339), "collection": collection, "folder": folder, "count": len(results), "tweets": results}
 	var b []byte
 	if pretty {
 		b, err = json.MarshalIndent(doc, "", "  ")
@@ -39,7 +43,11 @@ func JSON(ctx context.Context, st *store.Store, collection, output string, prett
 }
 
 func CSV(ctx context.Context, st *store.Store, collection, output string) (map[string]any, error) {
-	results, err := st.Search(ctx, "", collection, "", "", 100000, 0)
+	return CSVWithFolder(ctx, st, collection, "", output)
+}
+
+func CSVWithFolder(ctx context.Context, st *store.Store, collection, folder, output string) (map[string]any, error) {
+	results, err := exportRows(ctx, st, collection, folder)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +67,11 @@ func CSV(ctx context.Context, st *store.Store, collection, output string) (map[s
 }
 
 func Markdown(ctx context.Context, st *store.Store, collection, output string, hermesIndex bool) (map[string]any, error) {
-	results, err := st.Search(ctx, "", collection, "", "", 100000, 0)
+	return MarkdownWithFolder(ctx, st, collection, "", output, hermesIndex)
+}
+
+func MarkdownWithFolder(ctx context.Context, st *store.Store, collection, folder, output string, hermesIndex bool) (map[string]any, error) {
+	results, err := exportRows(ctx, st, collection, folder)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +108,11 @@ func Markdown(ctx context.Context, st *store.Store, collection, output string, h
 }
 
 func HTML(ctx context.Context, st *store.Store, collection, output string) (map[string]any, error) {
-	results, err := st.Search(ctx, "", collection, "", "", 100000, 0)
+	return HTMLWithFolder(ctx, st, collection, "", output)
+}
+
+func HTMLWithFolder(ctx context.Context, st *store.Store, collection, folder, output string) (map[string]any, error) {
+	results, err := exportRows(ctx, st, collection, folder)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +124,13 @@ func HTML(ctx context.Context, st *store.Store, collection, output string) (map[
 		}
 	}
 	return map[string]any{"output": output, "count": len(results)}, nil
+}
+
+func exportRows(ctx context.Context, st *store.Store, collection, folder string) ([]model.SearchResult, error) {
+	if collection == "" {
+		collection = "all"
+	}
+	return st.SearchWithFilters(ctx, "", collection, "", folder, "", "", false, false, 100000, 0)
 }
 
 func Backup(ctx context.Context, st *store.Store, output string) (map[string]any, error) {

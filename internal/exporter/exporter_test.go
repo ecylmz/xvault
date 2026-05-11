@@ -55,6 +55,44 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	}
 }
 
+func TestExportFolderFilter(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	page := model.ParsedPage{
+		Users: []model.User{{ID: "u1", Username: "alice"}},
+		Tweets: []model.Tweet{
+			{ID: "10001", Text: "folder alpha", AuthorID: "u1", AuthorUsername: "alice"},
+			{ID: "10002", Text: "folder beta", AuthorID: "u1", AuthorUsername: "alice"},
+		},
+		Collections: []model.CollectionItem{
+			{TweetID: "10001", CollectionType: "bookmark", BookmarkFolderID: "f1", BookmarkFolderName: "Research"},
+			{TweetID: "10002", CollectionType: "bookmark", BookmarkFolderID: "f2", BookmarkFolderName: "Later"},
+		},
+	}
+	if err := st.UpsertPage(ctx, page); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "research.json")
+	data, err := JSONWithFolder(ctx, st, "bookmarks", "Research", output, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data["count"] != 1 {
+		t.Fatalf("export count = %#v", data)
+	}
+	b, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "10001") || strings.Contains(string(b), "10002") {
+		t.Fatalf("folder export content = %s", b)
+	}
+}
+
 func TestBackupCreatesIntegrityCheckedSQLiteCopy(t *testing.T) {
 	ctx := context.Background()
 	st, err := store.Open(filepath.Join(t.TempDir(), "xvault.sqlite"))

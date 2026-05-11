@@ -605,15 +605,15 @@ func defaultFieldTogglesForApp() map[string]any {
 
 func exportCmd(st *state) *cobra.Command {
 	cmd := &cobra.Command{Use: "export"}
-	addExport := func(name string, run func(context.Context, *store.Store, string, string) (map[string]any, error)) {
-		var collection, output string
+	addExport := func(name string, run func(context.Context, *store.Store, string, string, string) (map[string]any, error)) {
+		var collection, folder, output string
 		c := &cobra.Command{Use: name, RunE: func(cmd *cobra.Command, args []string) error {
 			s, err := store.Open(config.Expand(st.cfg.Database.Path))
 			if err != nil {
 				return err
 			}
 			defer s.Close()
-			data, err := run(cmd.Context(), s, collection, output)
+			data, err := run(cmd.Context(), s, collection, folder, output)
 			if err != nil {
 				return err
 			}
@@ -625,19 +625,21 @@ func exportCmd(st *state) *cobra.Command {
 			return nil
 		}}
 		c.Flags().StringVar(&collection, "collection", "all", "collection")
+		c.Flags().StringVar(&folder, "folder", "", "bookmark folder")
 		c.Flags().StringVar(&output, "output", "", "output path")
 		cmd.AddCommand(c)
 	}
 	var pretty bool
 	jsonCmd := &cobra.Command{Use: "json", RunE: func(cmd *cobra.Command, args []string) error {
 		collection, _ := cmd.Flags().GetString("collection")
+		folder, _ := cmd.Flags().GetString("folder")
 		output, _ := cmd.Flags().GetString("output")
 		s, err := store.Open(config.Expand(st.cfg.Database.Path))
 		if err != nil {
 			return err
 		}
 		defer s.Close()
-		data, err := exporter.JSON(cmd.Context(), s, collection, output, pretty)
+		data, err := exporter.JSONWithFolder(cmd.Context(), s, collection, folder, output, pretty)
 		if err != nil {
 			return err
 		}
@@ -649,22 +651,23 @@ func exportCmd(st *state) *cobra.Command {
 		return nil
 	}}
 	jsonCmd.Flags().String("collection", "all", "collection")
+	jsonCmd.Flags().String("folder", "", "bookmark folder")
 	jsonCmd.Flags().String("output", "", "output path")
 	jsonCmd.Flags().BoolVar(&pretty, "pretty", false, "pretty JSON")
 	cmd.AddCommand(jsonCmd)
-	addExport("csv", exporter.CSV)
-	addExport("html", exporter.HTML)
-	addExport("markdown", func(ctx context.Context, s *store.Store, c, o string) (map[string]any, error) {
-		return exporter.Markdown(ctx, s, c, o, false)
+	addExport("csv", exporter.CSVWithFolder)
+	addExport("html", exporter.HTMLWithFolder)
+	addExport("markdown", func(ctx context.Context, s *store.Store, c, f, o string) (map[string]any, error) {
+		return exporter.MarkdownWithFolder(ctx, s, c, f, o, false)
 	})
-	addExport("hermes", func(ctx context.Context, s *store.Store, c, o string) (map[string]any, error) {
+	addExport("hermes", func(ctx context.Context, s *store.Store, c, f, o string) (map[string]any, error) {
 		if c == "" {
 			c = "all"
 		}
-		return exporter.Markdown(ctx, s, c, o, true)
+		return exporter.MarkdownWithFolder(ctx, s, c, f, o, true)
 	})
-	addExport("obsidian", func(ctx context.Context, s *store.Store, c, o string) (map[string]any, error) {
-		return exporter.Markdown(ctx, s, c, o, false)
+	addExport("obsidian", func(ctx context.Context, s *store.Store, c, f, o string) (map[string]any, error) {
+		return exporter.MarkdownWithFolder(ctx, s, c, f, o, false)
 	})
 	return cmd
 }
