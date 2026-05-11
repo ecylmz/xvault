@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ecylmz/xvault/internal/config"
 )
 
 func TestVersionJSON(t *testing.T) {
@@ -38,4 +40,24 @@ func TestErrorEnvelopeDoesNotLeakKnownSecretWords(t *testing.T) {
 		t.Fatalf("secret-like output leaked: %s", buf.String())
 	}
 	_ = os.Stdout
+}
+
+func TestSyncCountForCollectionUsesConfigDefaults(t *testing.T) {
+	cfg := config.Default()
+	count, all := syncCountForCollection(cfg, "likes", 100, false, false)
+	if count != 0 || !all {
+		t.Fatalf("likes defaults count=%d all=%v", count, all)
+	}
+	count, all = syncCountForCollection(cfg, "tweets", 100, false, false)
+	if count != cfg.Sync.DefaultCount || all {
+		t.Fatalf("tweets defaults count=%d all=%v", count, all)
+	}
+	count, all = syncCountForCollection(cfg, "likes", 25, false, true)
+	if count != 25 || all {
+		t.Fatalf("flag count=%d all=%v", count, all)
+	}
+	count, all = syncCountForCollection(cfg, "likes", 25, true, true)
+	if count != 25 || !all {
+		t.Fatalf("flag all count=%d all=%v", count, all)
+	}
 }

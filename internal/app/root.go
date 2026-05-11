@@ -355,8 +355,10 @@ func syncCmd(st *state) *cobra.Command {
 		sy := syncer.New(x, s, queryids.Load(""), dbPath, cookies.TWID, time.Duration(st.cfg.Sync.RequestDelayMS)*time.Millisecond)
 		results := []syncer.Result{}
 		threadsExpanded := 0
+		countChanged := cmd.Flags().Changed("count")
 		for _, col := range collections {
-			res, err := sy.Sync(cmd.Context(), syncer.Request{Collection: col, Count: count, MaxPages: maxPages, All: all, Full: full, Folder: folder})
+			reqCount, reqAll := syncCountForCollection(st.cfg, col, count, all, countChanged)
+			res, err := sy.Sync(cmd.Context(), syncer.Request{Collection: col, Count: reqCount, MaxPages: maxPages, All: reqAll, Full: full, Folder: folder})
 			results = append(results, res)
 			if err != nil {
 				return err
@@ -401,6 +403,23 @@ func syncCmd(st *state) *cobra.Command {
 		}})
 	}
 	return cmd
+}
+
+func syncCountForCollection(cfg config.Config, collection string, flagCount int, flagAll, countChanged bool) (int, bool) {
+	if flagAll || countChanged {
+		return flagCount, flagAll
+	}
+	count := cfg.Sync.DefaultCount
+	switch collection {
+	case "likes":
+		count = cfg.Sync.DefaultLikeCount
+	case "bookmarks":
+		count = cfg.Sync.DefaultBookmarkCount
+	}
+	if count < 0 {
+		return 0, true
+	}
+	return count, false
 }
 
 func searchCmd(st *state) *cobra.Command {
