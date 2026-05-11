@@ -176,6 +176,10 @@ func doctorCmd(st *state) *cobra.Command {
 		} else {
 			add("dotenv_permissions", false, "dotenv not found")
 		}
+		remoteOK, remoteMsg := gitRemoteStatus(cmd.Context())
+		add("git_remote", remoteOK, remoteMsg)
+		dockerOK, dockerMsg := dockerDaemonStatus(cmd.Context())
+		add("docker_daemon", dockerOK, dockerMsg)
 		data := map[string]any{"checks": checks}
 		if st.json {
 			writeJSON(os.Stdout, "doctor", st.started, data)
@@ -186,6 +190,35 @@ func doctorCmd(st *state) *cobra.Command {
 		}
 		return nil
 	}}
+}
+
+func gitRemoteStatus(ctx context.Context) (bool, string) {
+	if _, err := exec.LookPath("git"); err != nil {
+		return false, "git not found"
+	}
+	cmdCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(cmdCtx, "git", "remote", "get-url", "origin").Output()
+	if err != nil {
+		return false, "origin remote not configured"
+	}
+	remote := strings.TrimSpace(string(out))
+	if remote == "" {
+		return false, "origin remote not configured"
+	}
+	return true, remote
+}
+
+func dockerDaemonStatus(ctx context.Context) (bool, string) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		return false, "docker not found"
+	}
+	cmdCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(cmdCtx, "docker", "info", "--format", "{{.ServerVersion}}").CombinedOutput(); err == nil {
+		return true, "server " + strings.TrimSpace(string(out))
+	}
+	return false, "docker daemon unavailable"
 }
 
 func authCmd(st *state) *cobra.Command {
