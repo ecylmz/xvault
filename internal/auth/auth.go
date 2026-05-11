@@ -49,6 +49,10 @@ func Resolve(ctx context.Context, cfg config.Config) (Cookies, Source, error) {
 			if c.AuthToken != "" && c.CT0 != "" {
 				return c, Source{Name: "config"}, nil
 			}
+		case "firefox":
+			if c, err := ResolveFirefox(ctx); err == nil && c.AuthToken != "" && c.CT0 != "" {
+				return c, Source{Name: "firefox"}, nil
+			}
 		}
 	}
 	return Cookies{}, Source{}, ErrMissing

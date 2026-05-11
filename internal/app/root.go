@@ -216,7 +216,7 @@ func authCmd(st *state) *cobra.Command {
 		return nil
 	}})
 	cmd.AddCommand(&cobra.Command{Use: "sources", RunE: func(cmd *cobra.Command, args []string) error {
-		data := map[string]any{"sources": st.cfg.Auth.Sources, "dotenv_path": config.Expand(st.cfg.Auth.DotenvPath)}
+		data := map[string]any{"sources": st.cfg.Auth.Sources, "dotenv_path": config.Expand(st.cfg.Auth.DotenvPath), "browser_sources": auth.BrowserSources()}
 		if st.json {
 			writeJSON(os.Stdout, "auth sources", st.started, data)
 		} else {
