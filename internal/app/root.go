@@ -732,6 +732,9 @@ func verifyArchiveCmd(st *state) *cobra.Command {
 		if len(likeRows) > 0 {
 			data["sample_like_tweet_id"] = likeRows[0].TweetID
 		}
+		if data["ok"] != true {
+			return errCode("ARCHIVE_VERIFY_FAILED", "local archive verification failed")
+		}
 		if st.json {
 			writeJSON(os.Stdout, "verify-archive", st.started, data)
 		} else {

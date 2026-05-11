@@ -26,6 +26,15 @@ func TestShowIncludeRawBlocked(t *testing.T) {
 	}
 }
 
+func TestVerifyArchiveFailsForEmptyDB(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "empty.sqlite")
+	code := Execute([]string{"--db", db, "verify-archive", "--json"})
+	if code == 0 {
+		t.Fatal("expected empty archive verification to fail")
+	}
+}
+
 func TestErrorEnvelopeDoesNotLeakKnownSecretWords(t *testing.T) {
 	var buf bytes.Buffer
 	writeJSONError(&buf, "test", "AUTH_MISSING", "Authentication cookies appear to be expired.", false)
