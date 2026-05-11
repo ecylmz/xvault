@@ -681,6 +681,12 @@ func verifyArchiveCmd(st *state) *cobra.Command {
 			"fts_queryable":       len(ftsRows) > 0,
 			"ok":                  integrity == "ok" && bookmarkCount > 0 && likeCount > 0 && len(bookmarkRows) > 0 && len(likeRows) > 0 && len(ftsRows) > 0,
 		}
+		if len(bookmarkRows) > 0 {
+			data["sample_bookmark_tweet_id"] = bookmarkRows[0].TweetID
+		}
+		if len(likeRows) > 0 {
+			data["sample_like_tweet_id"] = likeRows[0].TweetID
+		}
 		if st.json {
 			writeJSON(os.Stdout, "verify-archive", st.started, data)
 		} else {
