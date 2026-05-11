@@ -165,6 +165,9 @@ func doctorCmd(st *state) *cobra.Command {
 			} else {
 				add("database_integrity", result == "ok", result)
 			}
+			if runs, err := s.ListSyncRuns(cmd.Context(), "all", "failed", 3); err == nil {
+				add("recent_sync_failures", len(runs) == 0, fmt.Sprintf("%d failed run(s)", len(runs)))
+			}
 		}
 		status := auth.Status(cmd.Context(), st.cfg)
 		add("auth_cookies", status["auth_token"] == "present" && status["ct0"] == "present", "auth_token="+status["auth_token"]+", ct0="+status["ct0"]+", twid="+status["twid"])
