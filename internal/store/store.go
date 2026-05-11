@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -333,8 +334,32 @@ func (s *Store) Show(ctx context.Context, id string) (map[string]any, error) {
 		"author_display_name": display, "created_at": created, "conversation_id": conv, "quoted_tweet_id": quoted,
 		"collections": cols, "bookmark_folder_name": folder, "url": CanonicalURL(username, id),
 		"metrics":            map[string]int64{"reply_count": reply, "repost_count": retweet, "like_count": like, "quote_count": quote},
-		"raw_json_available": raw != "",
+		"raw_json_available": raw != "", "raw_json_id": raw,
 	}, nil
+}
+
+func (s *Store) RawPayload(ctx context.Context, id string) (json.RawMessage, error) {
+	var payload []byte
+	var compressed int
+	err := s.db.QueryRowContext(ctx, `SELECT payload, compressed FROM raw_payloads WHERE id=?`, id).Scan(&payload, &compressed)
+	if err != nil {
+		return nil, err
+	}
+	if compressed != 0 {
+		gr, err := gzip.NewReader(bytes.NewReader(payload))
+		if err != nil {
+			return nil, err
+		}
+		defer gr.Close()
+		payload, err = io.ReadAll(gr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !json.Valid(payload) {
+		return nil, fmt.Errorf("raw payload %s is not valid JSON", id)
+	}
+	return json.RawMessage(payload), nil
 }
 
 func (s *Store) ShowByURL(ctx context.Context, url string) (map[string]any, error) {

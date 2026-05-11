@@ -383,6 +383,15 @@ func showCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		if includeRaw {
+			if rawID, ok := data["raw_json_id"].(string); ok && rawID != "" {
+				raw, err := s.RawPayload(cmd.Context(), rawID)
+				if err != nil {
+					return err
+				}
+				data["raw_json"] = raw
+			}
+		}
 		if st.json {
 			writeJSON(os.Stdout, "show", st.started, data)
 		} else {

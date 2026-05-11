@@ -139,3 +139,23 @@ func TestSearchWithMediaAndLinkFilters(t *testing.T) {
 		t.Fatalf("filtered results = %#v", results)
 	}
 }
+
+func TestRawPayloadRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	id, err := s.SaveRaw(ctx, "graphql", "Test", []byte(`{"ok":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := s.RawPayload(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != `{"ok":true}` {
+		t.Fatalf("raw = %s", raw)
+	}
+}
