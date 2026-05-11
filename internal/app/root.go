@@ -126,6 +126,7 @@ func addCommands(root *cobra.Command, st *state) {
 		return nil
 	}})
 	root.AddCommand(statusCmd(st), doctorCmd(st), statsCmd(st), authCmd(st), configCmd(st), syncCmd(st), searchCmd(st), showCmd(st), showURLCmd(st), openCmd(st), threadCmd(st), conversationCmd(st), exportCmd(st), dbCmd(st), backupCmd(st), vacuumCmd(st), serviceCmd(st), refreshIDsCmd(st))
+	root.AddCommand(bookmarksCmd(st))
 }
 
 func statusCmd(st *state) *cobra.Command {
@@ -579,6 +580,31 @@ func searchCmd(st *state) *cobra.Command {
 	cmd.Flags().BoolVar(&hasMedia, "has-media", false, "filter media")
 	cmd.Flags().BoolVar(&hasLink, "has-link", false, "filter links")
 	cmd.Flags().StringVar(&folder, "folder", "", "bookmark folder")
+	return cmd
+}
+
+func bookmarksCmd(st *state) *cobra.Command {
+	cmd := &cobra.Command{Use: "bookmarks"}
+	cmd.AddCommand(&cobra.Command{Use: "folders", RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		folders, err := s.BookmarkFolders(cmd.Context())
+		if err != nil {
+			return err
+		}
+		data := map[string]any{"folders": folders, "count": len(folders)}
+		if st.json {
+			writeJSON(os.Stdout, "bookmarks folders", st.started, data)
+		} else {
+			for _, f := range folders {
+				human(os.Stdout, "%s %d", f.Name, f.Count)
+			}
+		}
+		return nil
+	}})
 	return cmd
 }
 

@@ -510,6 +510,14 @@ type ThreadTweet struct {
 	Role     string
 }
 
+type BookmarkFolder struct {
+	ID        string `json:"id,omitempty"`
+	Name      string `json:"name"`
+	Count     int64  `json:"count"`
+	FirstSeen string `json:"first_seen_at,omitempty"`
+	LastSeen  string `json:"last_seen_at,omitempty"`
+}
+
 func (s *Store) UpsertThread(ctx context.Context, rec ThreadRecord) error {
 	if rec.ID == "" || rec.ConversationID == "" || rec.FocalTweetID == "" || rec.ThreadType == "" || rec.Mode == "" {
 		return fmt.Errorf("thread record is missing required fields")
@@ -634,6 +642,31 @@ func (s *Store) Stats(ctx context.Context) (map[string]any, error) {
 		out["database_size_bytes"] = info.Size()
 	}
 	return out, nil
+}
+
+func (s *Store) BookmarkFolders(ctx context.Context) ([]BookmarkFolder, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT COALESCE(bf.id,''), COALESCE(NULLIF(bf.name,''), COALESCE(c.bookmark_folder_name,'')), COUNT(DISTINCT c.tweet_id), COALESCE(bf.first_seen_at,''), COALESCE(bf.last_seen_at,'')
+FROM collections c
+LEFT JOIN bookmark_folders bf ON bf.id = c.bookmark_folder_id
+WHERE c.collection_type='bookmark'
+GROUP BY COALESCE(bf.id,''), COALESCE(NULLIF(bf.name,''), COALESCE(c.bookmark_folder_name,''))
+ORDER BY 2`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []BookmarkFolder{}
+	for rows.Next() {
+		var f BookmarkFolder
+		if err := rows.Scan(&f.ID, &f.Name, &f.Count, &f.FirstSeen, &f.LastSeen); err != nil {
+			return nil, err
+		}
+		if f.Name == "" {
+			f.Name = "(none)"
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) Vacuum(ctx context.Context) error {
