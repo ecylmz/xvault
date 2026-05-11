@@ -201,8 +201,15 @@ func TestCheckpointRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ok || got.Cursor != "CURSOR-1" || got.LastTweetID != "100" || got.LastSortIndex != "900" || got.TotalSeen != 25 || got.Status != "in_progress" {
+	if !ok || got.Cursor != "CURSOR-1" || got.LastTweetID != "100" || got.LastSortIndex != "900" || got.TotalSeen != 25 || got.Status != "in_progress" || got.UpdatedAt == "" {
 		t.Fatalf("checkpoint = %#v, ok=%v", got, ok)
+	}
+	checkpoints, err := st.ListCheckpoints(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(checkpoints) != 1 || checkpoints[0].CollectionType != "bookmark" {
+		t.Fatalf("checkpoints = %#v", checkpoints)
 	}
 	if err := st.ClearCheckpoint(ctx, "bookmark"); err != nil {
 		t.Fatal(err)

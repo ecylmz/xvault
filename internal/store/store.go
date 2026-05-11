@@ -28,13 +28,14 @@ type Store struct {
 }
 
 type Checkpoint struct {
-	CollectionType string
-	Cursor         string
-	LastTweetID    string
-	LastSortIndex  string
-	SourceRunID    string
-	TotalSeen      int
-	Status         string
+	CollectionType string `json:"collection_type"`
+	Cursor         string `json:"cursor,omitempty"`
+	LastTweetID    string `json:"last_tweet_id,omitempty"`
+	LastSortIndex  string `json:"last_sort_index,omitempty"`
+	SourceRunID    string `json:"source_run_id,omitempty"`
+	TotalSeen      int    `json:"total_seen"`
+	Status         string `json:"status"`
+	UpdatedAt      string `json:"updated_at,omitempty"`
 }
 
 type SyncRun struct {
@@ -657,8 +658,8 @@ ON CONFLICT(collection_type) DO UPDATE SET cursor=excluded.cursor, last_tweet_id
 func (s *Store) LoadCheckpoint(ctx context.Context, collectionType string) (Checkpoint, bool, error) {
 	var cp Checkpoint
 	var cursor, lastTweetID, lastSortIndex, sourceRunID sql.NullString
-	err := s.db.QueryRowContext(ctx, `SELECT collection_type, cursor, last_tweet_id, last_sort_index, source_run_id, total_seen, status FROM sync_checkpoints WHERE collection_type=?`, collectionType).
-		Scan(&cp.CollectionType, &cursor, &lastTweetID, &lastSortIndex, &sourceRunID, &cp.TotalSeen, &cp.Status)
+	err := s.db.QueryRowContext(ctx, `SELECT collection_type, cursor, last_tweet_id, last_sort_index, source_run_id, total_seen, status, updated_at FROM sync_checkpoints WHERE collection_type=?`, collectionType).
+		Scan(&cp.CollectionType, &cursor, &lastTweetID, &lastSortIndex, &sourceRunID, &cp.TotalSeen, &cp.Status, &cp.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Checkpoint{}, false, nil
 	}
@@ -670,6 +671,28 @@ func (s *Store) LoadCheckpoint(ctx context.Context, collectionType string) (Chec
 	cp.LastSortIndex = lastSortIndex.String
 	cp.SourceRunID = sourceRunID.String
 	return cp, true, nil
+}
+
+func (s *Store) ListCheckpoints(ctx context.Context) ([]Checkpoint, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT collection_type, cursor, last_tweet_id, last_sort_index, source_run_id, total_seen, status, updated_at FROM sync_checkpoints ORDER BY collection_type`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Checkpoint{}
+	for rows.Next() {
+		var cp Checkpoint
+		var cursor, lastTweetID, lastSortIndex, sourceRunID sql.NullString
+		if err := rows.Scan(&cp.CollectionType, &cursor, &lastTweetID, &lastSortIndex, &sourceRunID, &cp.TotalSeen, &cp.Status, &cp.UpdatedAt); err != nil {
+			return nil, err
+		}
+		cp.Cursor = cursor.String
+		cp.LastTweetID = lastTweetID.String
+		cp.LastSortIndex = lastSortIndex.String
+		cp.SourceRunID = sourceRunID.String
+		out = append(out, cp)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) ClearCheckpoint(ctx context.Context, collectionType string) error {

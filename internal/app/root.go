@@ -424,6 +424,26 @@ func syncCmd(st *state) *cobra.Command {
 	runsCmd.Flags().StringVar(&runsStatus, "status", "all", "status filter")
 	runsCmd.Flags().IntVar(&runsLimit, "limit", 20, "run limit")
 	cmd.AddCommand(runsCmd)
+	cmd.AddCommand(&cobra.Command{Use: "checkpoints", RunE: func(c *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		checkpoints, err := s.ListCheckpoints(c.Context())
+		if err != nil {
+			return err
+		}
+		data := map[string]any{"checkpoints": checkpoints, "count": len(checkpoints)}
+		if st.json {
+			writeJSON(os.Stdout, "sync checkpoints", st.started, data)
+		} else {
+			for _, cp := range checkpoints {
+				human(os.Stdout, "%s %s seen=%d cursor=%s", cp.CollectionType, cp.Status, cp.TotalSeen, cp.Cursor)
+			}
+		}
+		return nil
+	}})
 	for _, name := range []string{"likes", "bookmarks", "tweets", "reposts", "replies", "posts", "feed"} {
 		n := name
 		cmd.AddCommand(&cobra.Command{Use: n, RunE: func(c *cobra.Command, args []string) error {
