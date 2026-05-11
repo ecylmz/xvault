@@ -675,6 +675,24 @@ func (s *Store) CollectionCount(ctx context.Context, collection string) (int64, 
 	return count, err
 }
 
+func (s *Store) LastSuccessfulSync(ctx context.Context, collection string) (SyncRun, bool, error) {
+	var run SyncRun
+	var errorCode, errorMessage, finishedAt sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT id, collection_type, mode, status, pages_fetched, tweets_seen, tweets_inserted, tweets_updated, tweets_unchanged, errors_count, rate_limit_count, error_code, error_message, started_at, finished_at
+FROM sync_runs WHERE collection_type=? AND status='success' ORDER BY finished_at DESC, started_at DESC LIMIT 1`, normalizeCollection(collection)).
+		Scan(&run.ID, &run.CollectionType, &run.Mode, &run.Status, &run.PagesFetched, &run.TweetsSeen, &run.TweetsInserted, &run.TweetsUpdated, &run.TweetsUnchanged, &run.ErrorsCount, &run.RateLimitCount, &errorCode, &errorMessage, &run.StartedAt, &finishedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return SyncRun{}, false, nil
+	}
+	if err != nil {
+		return SyncRun{}, false, err
+	}
+	run.ErrorCode = errorCode.String
+	run.ErrorMessage = errorMessage.String
+	run.FinishedAt = finishedAt.String
+	return run, true, nil
+}
+
 func (s *Store) Vacuum(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE); VACUUM")
 	return err

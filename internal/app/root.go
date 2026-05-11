@@ -540,7 +540,18 @@ func syncCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		data := map[string]any{"bookmarks_count": bookmarks, "likes_count": likes, "recent_runs": runs}
+		last := map[string]any{}
+		if run, ok, err := s.LastSuccessfulSync(c.Context(), "bookmarks"); err != nil {
+			return err
+		} else if ok {
+			last["bookmarks"] = run
+		}
+		if run, ok, err := s.LastSuccessfulSync(c.Context(), "likes"); err != nil {
+			return err
+		} else if ok {
+			last["likes"] = run
+		}
+		data := map[string]any{"bookmarks_count": bookmarks, "likes_count": likes, "recent_runs": runs, "last_successful_sync": last}
 		if st.json {
 			writeJSON(os.Stdout, "sync summary", st.started, data)
 		} else {

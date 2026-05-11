@@ -290,4 +290,18 @@ func TestSyncRunLifecycle(t *testing.T) {
 	if got.ErrorMessage != "authentication cookies were rejected by X" {
 		t.Fatalf("sanitized run = %#v", got)
 	}
+	successID, err := st.StartSyncRun(ctx, "like", "incremental")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.FinishSyncRun(ctx, SyncRun{ID: successID, Status: "success", PagesFetched: 1, TweetsSeen: 2}); err != nil {
+		t.Fatal(err)
+	}
+	success, ok, err := st.LastSuccessfulSync(ctx, "likes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || success.ID != successID || success.Status != "success" {
+		t.Fatalf("last success = %#v ok=%v", success, ok)
+	}
 }
