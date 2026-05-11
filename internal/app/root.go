@@ -232,9 +232,17 @@ func authCmd(st *state) *cobra.Command {
 	cmd := &cobra.Command{Use: "auth"}
 	cmd.AddCommand(&cobra.Command{Use: "status", RunE: func(cmd *cobra.Command, args []string) error {
 		_, src, err := auth.Resolve(cmd.Context(), st.cfg)
-		data := map[string]any{"cookies": auth.Status(cmd.Context(), st.cfg), "source": src.Name}
+		dotenvPath := config.Expand(st.cfg.Auth.DotenvPath)
+		data := map[string]any{"cookies": auth.Status(cmd.Context(), st.cfg), "source": src.Name, "dotenv_path": dotenvPath}
 		if err != nil {
 			data["source"] = ""
+		}
+		if info, statErr := os.Stat(dotenvPath); statErr == nil {
+			data["dotenv_exists"] = true
+			data["dotenv_mode"] = fmt.Sprintf("%03o", info.Mode().Perm())
+			data["dotenv_modified_at"] = info.ModTime().UTC().Format(time.RFC3339)
+		} else {
+			data["dotenv_exists"] = false
 		}
 		if st.json {
 			writeJSON(os.Stdout, "auth status", st.started, data)
