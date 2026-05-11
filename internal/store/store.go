@@ -398,6 +398,26 @@ func (s *Store) ShowByURL(ctx context.Context, url string) (map[string]any, erro
 	return s.Show(ctx, parts[len(parts)-1])
 }
 
+func (s *Store) CollectionTweetIDs(ctx context.Context, collection string, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT tweet_id FROM collections WHERE collection_type=? ORDER BY synced_at DESC, tweet_id DESC LIMIT ?`, normalizeCollection(collection), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (s *Store) Thread(ctx context.Context, focalID, mode string, limit int) (map[string]any, error) {
 	if limit <= 0 {
 		limit = 200

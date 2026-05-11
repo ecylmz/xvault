@@ -122,6 +122,13 @@ func TestShowByURLThreadAndVacuum(t *testing.T) {
 	if memberCount != 2 {
 		t.Fatalf("persisted thread members = %d", memberCount)
 	}
+	ids, err := s.CollectionTweetIDs(ctx, "bookmarks", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 2 {
+		t.Fatalf("collection tweet ids = %#v", ids)
+	}
 	if err := s.Vacuum(ctx); err != nil {
 		t.Fatal(err)
 	}

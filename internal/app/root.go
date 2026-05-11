@@ -354,16 +354,29 @@ func syncCmd(st *state) *cobra.Command {
 		x := client.New(client.Options{Auth: cookies, MaxRetries: st.cfg.Sync.MaxRetries})
 		sy := syncer.New(x, s, queryids.Load(""), dbPath, cookies.TWID, time.Duration(st.cfg.Sync.RequestDelayMS)*time.Millisecond)
 		results := []syncer.Result{}
+		threadsExpanded := 0
 		for _, col := range collections {
 			res, err := sy.Sync(cmd.Context(), syncer.Request{Collection: col, Count: count, MaxPages: maxPages, All: all, Full: full, Folder: folder})
 			results = append(results, res)
 			if err != nil {
 				return err
 			}
+			if withThreads {
+				ids, err := s.CollectionTweetIDs(cmd.Context(), col, threadLimit)
+				if err != nil {
+					return err
+				}
+				for _, id := range ids {
+					if err := expandTweetDetail(cmd.Context(), st, s, id, threadMode); err != nil {
+						return err
+					}
+					threadsExpanded++
+				}
+			}
 		}
-		data := map[string]any{"results": results, "with_threads_requested": withThreads, "thread_mode": threadMode, "thread_limit": threadLimit}
+		data := map[string]any{"results": results, "with_threads": withThreads, "threads_expanded": threadsExpanded, "thread_mode": threadMode, "thread_limit": threadLimit}
 		if len(results) == 1 {
-			data = map[string]any{"result": results[0]}
+			data = map[string]any{"result": results[0], "with_threads": withThreads, "threads_expanded": threadsExpanded, "thread_mode": threadMode, "thread_limit": threadLimit}
 		}
 		if st.json {
 			writeJSON(os.Stdout, "sync", st.started, data)
