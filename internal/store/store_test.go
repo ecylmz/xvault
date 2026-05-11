@@ -106,3 +106,29 @@ func TestShowByURLThreadAndVacuum(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSearchWithMediaAndLinkFilters(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	page := model.ParsedPage{
+		Users:       []model.User{{ID: "u1", Username: "alice"}},
+		Tweets:      []model.Tweet{{ID: "10001", Text: "filter fixture", AuthorID: "u1", CreatedAt: "2026-01-01T00:00:00Z"}},
+		Collections: []model.CollectionItem{{TweetID: "10001", CollectionType: "bookmark"}},
+		URLs:        []model.URL{{TweetID: "10001", URL: "https://t.co/a", ExpandedURL: "https://example.com"}},
+		Media:       []model.Media{{ID: "m1", TweetID: "10001", MediaType: "photo", URL: "https://pbs.twimg.com/a.jpg"}},
+	}
+	if err := s.UpsertPage(ctx, page); err != nil {
+		t.Fatal(err)
+	}
+	results, err := s.SearchWithFilters(ctx, "filter", "bookmarks", "", "", "2026-01-01", "2026-12-31", true, true, 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || !results[0].HasMedia || !results[0].HasLinks {
+		t.Fatalf("filtered results = %#v", results)
+	}
+}

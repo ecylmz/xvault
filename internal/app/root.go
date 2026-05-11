@@ -337,16 +337,12 @@ func searchCmd(st *state) *cobra.Command {
 	var limit, offset int
 	var hasMedia, hasLink bool
 	cmd := &cobra.Command{Use: "search QUERY", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		_ = from
-		_ = to
-		_ = hasMedia
-		_ = hasLink
 		s, err := store.Open(config.Expand(st.cfg.Database.Path))
 		if err != nil {
 			return err
 		}
 		defer s.Close()
-		results, err := s.Search(cmd.Context(), args[0], source, author, folder, limit, offset)
+		results, err := s.SearchWithFilters(cmd.Context(), args[0], source, author, folder, from, to, hasMedia, hasLink, limit, offset)
 		if err != nil {
 			return err
 		}

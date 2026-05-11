@@ -248,6 +248,10 @@ func (s *Store) RebuildFTS(ctx context.Context) error {
 }
 
 func (s *Store) Search(ctx context.Context, query, source, author, folder string, limit, offset int) ([]model.SearchResult, error) {
+	return s.SearchWithFilters(ctx, query, source, author, folder, "", "", false, false, limit, offset)
+}
+
+func (s *Store) SearchWithFilters(ctx context.Context, query, source, author, folder, fromDate, toDate string, hasMedia, hasLink bool, limit, offset int) ([]model.SearchResult, error) {
 	if limit <= 0 {
 		limit = 10
 	} else if limit > 100000 {
@@ -272,6 +276,20 @@ func (s *Store) Search(ctx context.Context, query, source, author, folder string
 	if folder != "" {
 		where = append(where, "EXISTS (SELECT 1 FROM collections c WHERE c.tweet_id=t.id AND c.collection_type='bookmark' AND c.bookmark_folder_name=?)")
 		args = append(args, folder)
+	}
+	if fromDate != "" {
+		where = append(where, "COALESCE(t.created_at,'') >= ?")
+		args = append(args, fromDate)
+	}
+	if toDate != "" {
+		where = append(where, "COALESCE(t.created_at,'') <= ?")
+		args = append(args, toDate)
+	}
+	if hasMedia {
+		where = append(where, "EXISTS(SELECT 1 FROM media m WHERE m.tweet_id=t.id)")
+	}
+	if hasLink {
+		where = append(where, "EXISTS(SELECT 1 FROM urls ur WHERE ur.tweet_id=t.id)")
 	}
 	sqlText := `SELECT t.id, t.text, COALESCE(u.username,''), COALESCE(u.display_name,''), COALESCE(t.created_at,''), COALESCE(t.quoted_tweet_id,''), COALESCE(t.conversation_id,''),
 EXISTS(SELECT 1 FROM media m WHERE m.tweet_id=t.id), EXISTS(SELECT 1 FROM urls ur WHERE ur.tweet_id=t.id)
