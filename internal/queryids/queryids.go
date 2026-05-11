@@ -1,6 +1,7 @@
 package queryids
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -89,10 +90,17 @@ func Refresh(path string) (Cache, error) {
 	c := Load(path)
 	client := &http.Client{Timeout: 30 * time.Second}
 	pages := []string{"https://x.com/?lang=en", "https://x.com/explore", "https://x.com/notifications", "https://x.com/settings/profile"}
-	bundleRe := regexp.MustCompile(`https://abs\.twimg\.com/responsive-web/client-web(?:-legacy)?/[A-Za-z0-9._-]+\.js`)
+	return RefreshFromPages(context.Background(), path, c, pages, client)
+}
+
+func RefreshFromPages(ctx context.Context, path string, c Cache, pages []string, client *http.Client) (Cache, error) {
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	bundleRe := regexp.MustCompile(`https?://[^"'\s]+/responsive-web/client-web(?:-legacy)?/[A-Za-z0-9._-]+\.js`)
 	found := map[string]string{}
 	for _, page := range pages {
-		req, err := http.NewRequest(http.MethodGet, page, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, page, nil)
 		if err != nil {
 			continue
 		}
@@ -104,7 +112,7 @@ func Refresh(path string) (Cache, error) {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 		_ = resp.Body.Close()
 		for _, bundle := range bundleRe.FindAllString(string(body), -1) {
-			req, err := http.NewRequest(http.MethodGet, bundle, nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, bundle, nil)
 			if err != nil {
 				continue
 			}
