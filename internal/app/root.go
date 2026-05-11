@@ -668,13 +668,18 @@ func verifyArchiveCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		ftsRows, err := s.SearchWithFilters(cmd.Context(), "the", "all", "", "", "", "", false, false, 1, 0)
+		if err != nil {
+			return err
+		}
 		data := map[string]any{
 			"integrity":           integrity,
 			"bookmarks_count":     bookmarkCount,
 			"likes_count":         likeCount,
 			"bookmarks_queryable": len(bookmarkRows) > 0,
 			"likes_queryable":     len(likeRows) > 0,
-			"ok":                  integrity == "ok" && bookmarkCount > 0 && likeCount > 0 && len(bookmarkRows) > 0 && len(likeRows) > 0,
+			"fts_queryable":       len(ftsRows) > 0,
+			"ok":                  integrity == "ok" && bookmarkCount > 0 && likeCount > 0 && len(bookmarkRows) > 0 && len(likeRows) > 0 && len(ftsRows) > 0,
 		}
 		if st.json {
 			writeJSON(os.Stdout, "verify-archive", st.started, data)
