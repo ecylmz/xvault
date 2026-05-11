@@ -522,6 +522,32 @@ func syncCmd(st *state) *cobra.Command {
 		}
 		return nil
 	}})
+	cmd.AddCommand(&cobra.Command{Use: "summary", RunE: func(c *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		bookmarks, err := s.CollectionCount(c.Context(), "bookmarks")
+		if err != nil {
+			return err
+		}
+		likes, err := s.CollectionCount(c.Context(), "likes")
+		if err != nil {
+			return err
+		}
+		runs, err := s.ListSyncRuns(c.Context(), "all", "all", 5)
+		if err != nil {
+			return err
+		}
+		data := map[string]any{"bookmarks_count": bookmarks, "likes_count": likes, "recent_runs": runs}
+		if st.json {
+			writeJSON(os.Stdout, "sync summary", st.started, data)
+		} else {
+			human(os.Stdout, "bookmarks=%d likes=%d recent_runs=%d", bookmarks, likes, len(runs))
+		}
+		return nil
+	}})
 	for _, name := range []string{"likes", "bookmarks", "tweets", "reposts", "replies", "posts", "feed"} {
 		n := name
 		cmd.AddCommand(&cobra.Command{Use: n, RunE: func(c *cobra.Command, args []string) error {
