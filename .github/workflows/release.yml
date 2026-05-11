@@ -25,6 +25,7 @@ jobs:
         with:
           go-version: "1.26.x"
       - run: go test ./...
+      - run: make release-check
       - name: Build
         run: |
           mkdir -p dist

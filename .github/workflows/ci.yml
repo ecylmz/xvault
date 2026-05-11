@@ -16,5 +16,6 @@ jobs:
         with:
           go-version: "1.26.x"
       - run: go test ./...
+      - run: make release-check
       - run: go build ./cmd/xvault
       - uses: golangci/golangci-lint-action@v9
