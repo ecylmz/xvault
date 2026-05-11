@@ -205,7 +205,7 @@ func authCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		x := client.New(client.Options{Auth: c})
+		x := client.New(client.Options{Auth: c, MaxRetries: st.cfg.Sync.MaxRetries})
 		raw, status, err := x.FetchGraphQL(cmd.Context(), client.Operation{
 			Name:    "Viewer",
 			QueryID: queryids.Load("").QueryID("Viewer"),
@@ -351,7 +351,7 @@ func syncCmd(st *state) *cobra.Command {
 			return err
 		}
 		defer s.Close()
-		x := client.New(client.Options{Auth: cookies})
+		x := client.New(client.Options{Auth: cookies, MaxRetries: st.cfg.Sync.MaxRetries})
 		sy := syncer.New(x, s, queryids.Load(""), dbPath, cookies.TWID, time.Duration(st.cfg.Sync.RequestDelayMS)*time.Millisecond)
 		results := []syncer.Result{}
 		for _, col := range collections {
@@ -565,7 +565,7 @@ func expandTweetDetail(ctx context.Context, st *state, s *store.Store, tweetID, 
 		return err
 	}
 	qids := queryids.Load("")
-	x := client.New(client.Options{Auth: cookies})
+	x := client.New(client.Options{Auth: cookies, MaxRetries: st.cfg.Sync.MaxRetries})
 	raw, _, err := x.FetchGraphQL(ctx, client.Operation{
 		Name:    "TweetDetail",
 		QueryID: qids.QueryID("TweetDetail"),
