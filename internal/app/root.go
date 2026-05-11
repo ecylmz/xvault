@@ -550,18 +550,27 @@ func syncCountForCollection(cfg config.Config, collection string, flagCount int,
 func searchCmd(st *state) *cobra.Command {
 	var source, author, from, to, folder string
 	var limit, offset int
-	var hasMedia, hasLink bool
-	cmd := &cobra.Command{Use: "search QUERY", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	var hasMedia, hasLink, recent bool
+	cmd := &cobra.Command{Use: "search [QUERY]", Args: func(cmd *cobra.Command, args []string) error {
+		if recent {
+			return cobra.MaximumNArgs(1)(cmd, args)
+		}
+		return cobra.ExactArgs(1)(cmd, args)
+	}, RunE: func(cmd *cobra.Command, args []string) error {
 		s, err := store.Open(config.Expand(st.cfg.Database.Path))
 		if err != nil {
 			return err
 		}
 		defer s.Close()
-		results, err := s.SearchWithFilters(cmd.Context(), args[0], source, author, folder, from, to, hasMedia, hasLink, limit, offset)
+		query := ""
+		if len(args) > 0 {
+			query = args[0]
+		}
+		results, err := s.SearchWithFilters(cmd.Context(), query, source, author, folder, from, to, hasMedia, hasLink, limit, offset)
 		if err != nil {
 			return err
 		}
-		data := map[string]any{"query": args[0], "source": source, "limit": limit, "offset": offset, "total_estimate": len(results), "results": results}
+		data := map[string]any{"query": query, "source": source, "recent": recent, "limit": limit, "offset": offset, "total_estimate": len(results), "results": results}
 		if st.json {
 			writeJSON(os.Stdout, "search", st.started, data)
 		} else {
@@ -579,6 +588,7 @@ func searchCmd(st *state) *cobra.Command {
 	cmd.Flags().StringVar(&to, "to", "", "to date")
 	cmd.Flags().BoolVar(&hasMedia, "has-media", false, "filter media")
 	cmd.Flags().BoolVar(&hasLink, "has-link", false, "filter links")
+	cmd.Flags().BoolVar(&recent, "recent", false, "list recent records without requiring a query")
 	cmd.Flags().StringVar(&folder, "folder", "", "bookmark folder")
 	return cmd
 }
