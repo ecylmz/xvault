@@ -518,7 +518,9 @@ func threadCmd(st *state) *cobra.Command {
 			return err
 		}
 		defer s.Close()
-		_ = expandTweetDetail(cmd.Context(), st, s, args[0], mode)
+		if err := expandTweetDetail(cmd.Context(), st, s, args[0], mode); err != nil {
+			return err
+		}
 		data, err := s.Thread(cmd.Context(), args[0], mode, limit)
 		if err != nil {
 			return err
@@ -543,7 +545,9 @@ func conversationCmd(st *state) *cobra.Command {
 			return err
 		}
 		defer s.Close()
-		_ = expandTweetDetail(cmd.Context(), st, s, args[0], "conversation")
+		if err := expandTweetDetail(cmd.Context(), st, s, args[0], "conversation"); err != nil {
+			return err
+		}
 		data, err := s.Thread(cmd.Context(), args[0], "conversation", limit)
 		if err != nil {
 			return err
