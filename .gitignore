@@ -1,0 +1,11 @@
+/bin/
+/dist/
+/xvault
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+.env
+.DS_Store
+coverage.out
+*.test

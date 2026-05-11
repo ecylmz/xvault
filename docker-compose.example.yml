@@ -1,0 +1,20 @@
+services:
+  sync-bookmarks:
+    build: .
+    command: ["sync", "bookmarks", "--count", "300", "--json"]
+    volumes:
+      - ${HOME}/.config/xvault:/home/xvault/.config/xvault:ro
+      - ${HOME}/.local/share/xvault:/home/xvault/.local/share/xvault
+
+  sync-likes:
+    build: .
+    command: ["sync", "likes", "--count", "300", "--json"]
+    volumes:
+      - ${HOME}/.config/xvault:/home/xvault/.config/xvault:ro
+      - ${HOME}/.local/share/xvault:/home/xvault/.local/share/xvault
+
+  hermes-export-readonly:
+    image: alpine:3.22
+    command: ["sh", "-c", "find /exports -maxdepth 2 -type f | head"]
+    volumes:
+      - ${HOME}/.local/share/xvault/exports:/exports:ro
