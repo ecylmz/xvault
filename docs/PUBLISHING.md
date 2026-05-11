@@ -6,6 +6,7 @@ Run the local release gates before creating a GitHub repository or tag:
 go test ./...
 golangci-lint run
 go build -o bin/xvault ./cmd/xvault
+make release-check
 for os in linux darwin; do
   for arch in amd64 arm64; do
     GOOS=$os GOARCH=$arch go build -o /tmp/xvault-$os-$arch ./cmd/xvault

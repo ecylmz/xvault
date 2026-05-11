@@ -15,11 +15,15 @@ fmt:
 	gofmt -w .
 
 .PHONY: ci
-ci: fmt test
+ci: fmt test release-check
 
 .PHONY: build
 build:
 	go build -o bin/xvault ./cmd/xvault
+
+.PHONY: release-check
+release-check:
+	sh tools/check_release_safety.sh
 
 .PHONY: update-golden
 update-golden:
