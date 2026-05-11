@@ -20,7 +20,8 @@ import (
 )
 
 type Store struct {
-	db *sql.DB
+	db   *sql.DB
+	path string
 }
 
 func Open(path string) (*Store, error) {
@@ -31,7 +32,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{db: db}
+	s := &Store{db: db, path: path}
 	if err := s.Migrate(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -436,6 +437,37 @@ func (s *Store) Stats(ctx context.Context) (map[string]any, error) {
 		collections[k] = v
 	}
 	out["collections"] = collections
+	folders := map[string]int64{}
+	folderRows, err := s.db.QueryContext(ctx, `SELECT COALESCE(bookmark_folder_name,''), COUNT(DISTINCT tweet_id) FROM collections WHERE collection_type='bookmark' GROUP BY COALESCE(bookmark_folder_name,'') ORDER BY 1`)
+	if err != nil {
+		return nil, err
+	}
+	defer folderRows.Close()
+	for folderRows.Next() {
+		var name string
+		var count int64
+		if err := folderRows.Scan(&name, &count); err != nil {
+			return nil, err
+		}
+		if name == "" {
+			name = "(none)"
+		}
+		folders[name] = count
+	}
+	if err := folderRows.Err(); err != nil {
+		return nil, err
+	}
+	out["bookmark_folders"] = folders
+	var rawBytes sql.NullInt64
+	_ = s.db.QueryRowContext(ctx, `SELECT SUM(length(payload)) FROM raw_payloads`).Scan(&rawBytes)
+	if rawBytes.Valid {
+		out["raw_payload_size_bytes"] = rawBytes.Int64
+	} else {
+		out["raw_payload_size_bytes"] = int64(0)
+	}
+	if info, err := os.Stat(s.path); err == nil {
+		out["database_size_bytes"] = info.Size()
+	}
 	return out, nil
 }
 

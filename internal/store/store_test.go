@@ -37,6 +37,13 @@ func TestStoreUpsertSearchAndCollections(t *testing.T) {
 	if results[0].BookmarkFolderName != "Research" || len(results[0].Collections) != 1 {
 		t.Fatalf("unexpected result: %#v", results[0])
 	}
+	stats, err := s.Stats(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats["database_size_bytes"] == nil || stats["raw_payload_size_bytes"] == nil {
+		t.Fatalf("stats missing size fields: %#v", stats)
+	}
 	if err := s.RebuildFTS(ctx); err != nil {
 		t.Fatal(err)
 	}
