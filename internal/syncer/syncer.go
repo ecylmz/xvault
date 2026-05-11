@@ -78,7 +78,7 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (res Result, err error) 
 			status = "failed"
 			errorsCount = 1
 			errorCode = classifySyncError(err)
-			errorMessage = err.Error()
+			errorMessage = summarizeSyncError(errorCode)
 		} else if res.NextCursor != "" && !res.CheckpointCleared {
 			status = "partial"
 		}
@@ -225,6 +225,19 @@ func (s *Syncer) saveCheckpoint(ctx context.Context, collectionType, runID, curs
 		}
 	}
 	return s.store.SaveCheckpoint(ctx, cp)
+}
+
+func summarizeSyncError(code string) string {
+	switch code {
+	case "RATE_LIMITED":
+		return "rate limited by X"
+	case "AUTH_EXPIRED":
+		return "authentication cookies were rejected by X"
+	case "QUERY_ID_STALE":
+		return "X GraphQL query ID appears stale"
+	default:
+		return "sync failed"
+	}
 }
 
 func classifySyncError(err error) string {

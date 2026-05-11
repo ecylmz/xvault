@@ -149,3 +149,30 @@ func TestSyncPersistsAndResumesCheckpoint(t *testing.T) {
 		t.Fatalf("expected checkpoint cleared, ok=%v err=%v", ok, err)
 	}
 }
+
+func TestSyncRunStoresSanitizedFailureMessage(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "xvault.sqlite")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"errors":[{"message":"Could not authenticate you","code":32}]}`, http.StatusUnauthorized)
+	}))
+	defer server.Close()
+	qids := queryids.Cache{Operations: map[string]queryids.Entry{"Likes": {QueryID: "test-likes"}}}
+	x := client.New(client.Options{BaseURL: server.URL, Auth: auth.Cookies{AuthToken: "a", CT0: "c", TWID: "u=1"}, MaxRetries: 0, RetryBaseDelay: time.Nanosecond})
+	result, err := New(x, st, qids, dbPath, "u=1", 0).Sync(ctx, Request{Collection: "likes", Count: 10})
+	if err == nil {
+		t.Fatal("expected auth error")
+	}
+	run, err := st.GetSyncRun(ctx, result.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.ErrorCode != "AUTH_EXPIRED" || run.ErrorMessage != "authentication cookies were rejected by X" {
+		t.Fatalf("sync run = %#v", run)
+	}
+}
