@@ -53,6 +53,13 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 			t.Fatalf("%s does not contain tweet id", path)
 		}
 	}
+	htmlDoc, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(htmlDoc), "data.flatMap") || strings.Contains(string(htmlDoc), "<option>bookmark</option>") {
+		t.Fatalf("html collection filter is not data-driven")
+	}
 }
 
 func TestExportFolderFilter(t *testing.T) {
