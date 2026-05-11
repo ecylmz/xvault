@@ -14,6 +14,8 @@ The database contains:
 - `tweets_fts`
 - `tweets_fts_map`
 
+The checked-in SQL files under `migrations/` mirror the schema embedded in the Go binary and can be applied to an empty SQLite database for inspection or external tooling.
+
 FTS is contentless. Search previews come from `tweets.text`, not from SQLite `snippet()` or `highlight()`.
 
 Use:
