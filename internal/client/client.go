@@ -16,10 +16,12 @@ import (
 const bearerToken = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs=1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
 
 type Operation struct {
-	Name      string
-	QueryID   string
-	Variables map[string]any
-	Features  map[string]any
+	Name         string
+	QueryID      string
+	Method       string
+	Variables    map[string]any
+	Features     map[string]any
+	FieldToggles map[string]any
 }
 
 type Options struct {
@@ -91,13 +93,28 @@ func (c *Client) FetchGraphQL(ctx context.Context, op Operation) ([]byte, int, e
 	if op.Features == nil {
 		op.Features = DefaultFeatures()
 	}
-	vars, _ := json.Marshal(op.Variables)
-	features, _ := json.Marshal(op.Features)
 	endpoint := fmt.Sprintf("%s/i/api/graphql/%s/%s", c.baseURL, url.PathEscape(op.QueryID), url.PathEscape(op.Name))
-	q := url.Values{}
-	q.Set("variables", string(vars))
-	q.Set("features", string(features))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+q.Encode(), nil)
+	method := op.Method
+	if method == "" {
+		method = http.MethodGet
+	}
+	var req *http.Request
+	var err error
+	if method == http.MethodPost {
+		body, _ := json.Marshal(map[string]any{"variables": op.Variables, "features": op.Features, "fieldToggles": op.FieldToggles})
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	} else {
+		vars, _ := json.Marshal(op.Variables)
+		features, _ := json.Marshal(op.Features)
+		q := url.Values{}
+		q.Set("variables", string(vars))
+		q.Set("features", string(features))
+		if op.FieldToggles != nil {
+			fieldToggles, _ := json.Marshal(op.FieldToggles)
+			q.Set("fieldToggles", string(fieldToggles))
+		}
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+q.Encode(), nil)
+	}
 	if err != nil {
 		return nil, 0, err
 	}

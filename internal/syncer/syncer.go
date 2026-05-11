@@ -165,7 +165,7 @@ func (s *Syncer) operations(req Request) ([]client.Operation, error) {
 		v := baseVars()
 		v["includePromotedContent"] = true
 		v["withCommunity"] = false
-		return []client.Operation{{Name: "UserTweetsAndReplies", QueryID: s.qids.QueryID("UserTweetsAndReplies"), Variables: v}}, nil
+		return []client.Operation{{Name: "UserTweetsAndReplies", QueryID: s.qids.QueryID("UserTweetsAndReplies"), Method: "POST", Variables: v, FieldToggles: defaultFieldToggles()}}, nil
 	case "posts":
 		return []client.Operation{{Name: "UserTweets", QueryID: s.qids.QueryID("UserTweets"), Variables: baseVars()}}, nil
 	case "reposts":
@@ -174,6 +174,19 @@ func (s *Syncer) operations(req Request) ([]client.Operation, error) {
 		return []client.Operation{{Name: "HomeLatestTimeline", QueryID: s.qids.QueryID("HomeLatestTimeline"), Variables: map[string]any{"count": count, "includePromotedContent": false, "latestControlAvailable": true}}}, nil
 	default:
 		return nil, fmt.Errorf("unsupported sync collection %q", req.Collection)
+	}
+}
+
+func defaultFieldToggles() map[string]any {
+	return map[string]any{
+		"withPayments":                false,
+		"withAuxiliaryUserLabels":     false,
+		"withArticleRichContentState": false,
+		"withArticlePlainText":        false,
+		"withArticleSummaryText":      false,
+		"withArticleVoiceOver":        false,
+		"withGrokAnalyze":             false,
+		"withDisallowedReplyControls": false,
 	}
 }
 
