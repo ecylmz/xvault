@@ -27,6 +27,8 @@ xvault sync sanitize-runs --json
 xvault db integrity --json
 ```
 
+`doctor` also reports publish-readiness checks for the Git `origin` remote and Docker daemon availability.
+
 `sync runs` reports recent success, partial, and failed sync attempts with run IDs, counters, error codes, and timestamps. Filter it with `--collection bookmarks`, `--collection likes`, or `--status failed` when diagnosing automation.
 
 `sync checkpoints` reports any retained resumable cursors after a bounded, interrupted, partial, or rate-limited sync.
