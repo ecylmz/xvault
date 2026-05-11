@@ -15,3 +15,9 @@ xvault export html --collection all --output archive.html --json
 HTML export is a single offline file with local search and filters.
 
 Hermes export writes Markdown plus `index.jsonl`.
+
+List local bookmark folder buckets before folder-filtered export:
+
+```bash
+xvault bookmarks folders --json
+```
