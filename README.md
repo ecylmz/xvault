@@ -62,6 +62,7 @@ xvault --auth-source chrome auth test --json
 xvault sync likes --count 100 --max-pages 2 --json
 xvault sync bookmarks --count 100 --max-pages 2 --json
 xvault sync runs --limit 10 --json
+xvault sync checkpoints --json
 xvault search "query" --source bookmarks --limit 10 --json
 xvault show TWEET_ID --json
 xvault export json --collection all --output archive.json --json
