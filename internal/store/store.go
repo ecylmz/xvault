@@ -337,7 +337,7 @@ FROM tweets t LEFT JOIN users u ON u.id=t.author_id LEFT JOIN tweets qt ON qt.id
 		return nil, err
 	}
 	defer rows.Close()
-	var out []model.SearchResult
+	out := []model.SearchResult{}
 	for rows.Next() {
 		var r model.SearchResult
 		if err := rows.Scan(&r.TweetID, &r.TextPreview, &r.AuthorUsername, &r.AuthorDisplayName, &r.CreatedAt, &r.QuotedTweetID, &r.QuotedTextPreview, &r.QuotedAuthorUsername, &r.QuotedAuthorDisplayName, &r.ConversationID, &r.HasMedia, &r.HasLinks); err != nil {

@@ -99,6 +99,27 @@ func TestBackupVerifyRejectsInvalidDatabase(t *testing.T) {
 	}
 }
 
+func TestEmptyListJSONUsesArrays(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "empty.sqlite")
+	code, out := executeCaptureStdout(t, []string{"--db", db, "search", "--recent", "--source", "bookmarks", "--json"})
+	if code != 0 {
+		t.Fatalf("search exit=%d output=%s", code, out)
+	}
+	if !strings.Contains(out, `"results":[]`) {
+		t.Fatalf("empty search did not encode array: %s", out)
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	code, out = executeCaptureStdout(t, []string{"backup", "list", "--json"})
+	if code != 0 {
+		t.Fatalf("backup list exit=%d output=%s", code, out)
+	}
+	if !strings.Contains(out, `"backups":[]`) {
+		t.Fatalf("empty backups did not encode array: %s", out)
+	}
+}
+
 func TestServiceExamplesIncludeBookmarksAndLikes(t *testing.T) {
 	code, out := executeCaptureStdout(t, []string{"service", "cron", "print"})
 	if code != 0 {

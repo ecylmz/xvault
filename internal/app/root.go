@@ -1215,6 +1215,9 @@ func backupCmd(st *state) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&output, "output", "", "backup path")
 	cmd.AddCommand(&cobra.Command{Use: "list", RunE: func(cmd *cobra.Command, args []string) error {
 		files, _ := filepath.Glob(filepath.Join(os.Getenv("HOME"), ".local/state/xvault/backups/*.sqlite"))
+		if files == nil {
+			files = []string{}
+		}
 		if st.json {
 			writeJSON(os.Stdout, "backup list", st.started, map[string]any{"backups": files})
 		} else {
