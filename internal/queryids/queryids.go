@@ -26,6 +26,8 @@ type Cache struct {
 	Operations map[string]Entry `json:"operations"`
 }
 
+const DefaultCachePath = "~/.config/xvault/query-ids-cache.json"
+
 var fallback = map[string]string{
 	"Bookmarks":              "N2H8tZcGM5XLYU1L8KxM6A",
 	"BookmarkSearchTimeline": "Nikib-QgCS0D_GU_YI8gBQ",
@@ -41,10 +43,14 @@ var fallback = map[string]string{
 	"Viewer":                 "_8ClT24oZ8tpylf_OSuNdg",
 }
 
+func RequiredOperations() []string {
+	return []string{"Bookmarks", "BookmarkFolderTimeline", "Likes", "TweetDetail", "SearchTimeline", "UserTweets", "UserTweetsAndReplies", "Following", "Followers", "HomeLatestTimeline"}
+}
+
 func Load(path string) Cache {
 	c := Cache{Version: 1, TTLHours: 24, Operations: map[string]Entry{}}
 	if path == "" {
-		path = "~/.config/xvault/query-ids-cache.json"
+		path = DefaultCachePath
 	}
 	b, err := os.ReadFile(config.Expand(path))
 	if err == nil {
@@ -89,7 +95,7 @@ func ParseBundle(js string) map[string]string {
 
 func Refresh(path string) (Cache, error) {
 	if path == "" {
-		path = "~/.config/xvault/query-ids-cache.json"
+		path = DefaultCachePath
 	}
 	c := Load(path)
 	client := &http.Client{Timeout: 30 * time.Second}

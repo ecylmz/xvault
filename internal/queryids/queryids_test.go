@@ -58,7 +58,7 @@ func TestRefreshFromPagesWritesDiscoveredIDs(t *testing.T) {
 
 func TestFallbackIncludesRequiredOperations(t *testing.T) {
 	cache := Load(filepath.Join(t.TempDir(), "missing.json"))
-	for _, op := range []string{"Bookmarks", "BookmarkFolderTimeline", "Likes", "TweetDetail", "SearchTimeline", "UserTweets", "UserTweetsAndReplies", "Following", "Followers", "HomeLatestTimeline"} {
+	for _, op := range RequiredOperations() {
 		if cache.QueryID(op) == "" {
 			t.Fatalf("missing fallback query id for %s", op)
 		}

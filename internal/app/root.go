@@ -196,6 +196,10 @@ func doctorCmd(st *state) *cobra.Command {
 		} else {
 			add("dotenv_permissions", false, "dotenv not found")
 		}
+		fallbackOK, fallbackMsg := queryIDFallbackStatus()
+		add("query_id_fallbacks", fallbackOK, fallbackMsg)
+		cacheOK, cacheMsg := queryIDCacheStatus()
+		add("query_id_cache", cacheOK, cacheMsg)
 		remoteOK, remoteMsg := gitRemoteStatus(cmd.Context())
 		add("git_remote", remoteOK, remoteMsg)
 		dockerOK, dockerMsg := dockerDaemonStatus(cmd.Context())
@@ -228,6 +232,47 @@ func doctorAuthOnlineStatus(ctx context.Context, cfg config.Config) (bool, strin
 		return false, classifyCode(err)
 	}
 	return status >= 200 && status < 300, fmt.Sprintf("source=%s http=%d", src.Name, status)
+}
+
+func queryIDFallbackStatus() (bool, string) {
+	cache := queryids.Load("")
+	missing := []string{}
+	for _, op := range queryids.RequiredOperations() {
+		if cache.QueryID(op) == "" {
+			missing = append(missing, op)
+		}
+	}
+	if len(missing) > 0 {
+		return false, "missing fallback query IDs: " + strings.Join(missing, ", ")
+	}
+	return true, fmt.Sprintf("%d required operation fallback(s) available", len(queryids.RequiredOperations()))
+}
+
+func queryIDCacheStatus() (bool, string) {
+	path := config.Expand(queryids.DefaultCachePath)
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, "cache not found"
+		}
+		return false, err.Error()
+	}
+	cache := queryids.Load(path)
+	updatedAt := info.ModTime().UTC()
+	if cache.UpdatedAt != "" {
+		if parsed, err := time.Parse(time.RFC3339, cache.UpdatedAt); err == nil {
+			updatedAt = parsed
+		}
+	}
+	ttl := cache.TTLHours
+	if ttl <= 0 {
+		ttl = 24
+	}
+	age := time.Since(updatedAt)
+	if age > time.Duration(ttl)*time.Hour {
+		return false, fmt.Sprintf("cache stale: updated_at=%s ttl_hours=%d", updatedAt.Format(time.RFC3339), ttl)
+	}
+	return true, fmt.Sprintf("fresh: updated_at=%s ttl_hours=%d operations=%d", updatedAt.Format(time.RFC3339), ttl, len(cache.Operations))
 }
 
 func gitRemoteStatus(ctx context.Context) (bool, string) {
