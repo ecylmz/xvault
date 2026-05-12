@@ -7,12 +7,15 @@ go test ./...
 golangci-lint run
 go build -o bin/xvault ./cmd/xvault
 make release-check
+make verify-archive
 for os in linux darwin; do
   for arch in amd64 arm64; do
     GOOS=$os GOARCH=$arch go build -o /tmp/xvault-$os-$arch ./cmd/xvault
   done
 done
 ```
+
+`make verify-archive` is intentionally a local publishing gate, not a CI gate. It uses the configured SQLite database and fails unless the archive has synced bookmarks and likes that are queryable through normal collection search and FTS.
 
 If Docker is available locally, also verify the container image:
 

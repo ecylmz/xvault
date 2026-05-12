@@ -25,6 +25,11 @@ build:
 release-check:
 	sh tools/check_release_safety.sh
 
+.PHONY: verify-archive
+verify-archive:
+	go build -o bin/xvault ./cmd/xvault
+	bin/xvault verify-archive --json
+
 .PHONY: update-golden
 update-golden:
 	UPDATE_GOLDEN=1 go test ./...

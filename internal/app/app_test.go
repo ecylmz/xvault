@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/ecylmz/xvault/internal/config"
+	"github.com/ecylmz/xvault/internal/model"
+	"github.com/ecylmz/xvault/internal/store"
 )
 
 func TestVersionJSON(t *testing.T) {
@@ -32,6 +34,36 @@ func TestVerifyArchiveFailsForEmptyDB(t *testing.T) {
 	code := Execute([]string{"--db", db, "verify-archive", "--json"})
 	if code == 0 {
 		t.Fatal("expected empty archive verification to fail")
+	}
+}
+
+func TestVerifyArchiveSucceedsForQueryableBookmarksAndLikes(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "archive.sqlite")
+	s, err := store.Open(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.UpsertPage(t.Context(), model.ParsedPage{
+		Users: []model.User{{ID: "u1", Username: "author"}},
+		Tweets: []model.Tweet{
+			{ID: "1", Text: "the bookmarked tweet", AuthorID: "u1", CreatedAt: "2026-05-12T00:00:00Z"},
+			{ID: "2", Text: "the liked tweet", AuthorID: "u1", CreatedAt: "2026-05-12T00:00:00Z"},
+		},
+		Collections: []model.CollectionItem{
+			{TweetID: "1", CollectionType: "bookmark"},
+			{TweetID: "2", CollectionType: "like"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	code := Execute([]string{"--db", db, "verify-archive", "--json"})
+	if code != 0 {
+		t.Fatalf("expected archive verification to pass, exit code = %d", code)
 	}
 }
 
