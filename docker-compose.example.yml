@@ -1,18 +1,34 @@
 services:
+  # One-shot bookmark sync. Run manually or from host cron/systemd:
+  # docker compose run --rm sync-bookmarks
   sync-bookmarks:
     build: .
-    command: ["sync", "bookmarks", "--count", "300", "--json"]
+    command: ["sync", "bookmarks", "--count", "300", "--max-pages", "5", "--json"]
     volumes:
       - ${HOME}/.config/xvault:/home/xvault/.config/xvault:ro
       - ${HOME}/.local/share/xvault:/home/xvault/.local/share/xvault
 
+  # One-shot likes sync. Run manually or from host cron/systemd:
+  # docker compose run --rm sync-likes
   sync-likes:
     build: .
-    command: ["sync", "likes", "--count", "300", "--json"]
+    command: ["sync", "likes", "--count", "300", "--max-pages", "5", "--json"]
     volumes:
       - ${HOME}/.config/xvault:/home/xvault/.config/xvault:ro
       - ${HOME}/.local/share/xvault:/home/xvault/.local/share/xvault
 
+  # Host-scheduled automation example. Keep scheduling outside the container:
+  # 0 */3 * * * cd /path/to/xvault && docker compose run --rm sync-bookmarks
+  # 30 */3 * * * cd /path/to/xvault && docker compose run --rm sync-likes
+  scheduled-sync-example:
+    build: .
+    command: ["service", "cron", "print"]
+    profiles: ["examples"]
+    volumes:
+      - ${HOME}/.config/xvault:/home/xvault/.config/xvault:ro
+      - ${HOME}/.local/share/xvault:/home/xvault/.local/share/xvault
+
+  # Hermes/agent sidecar example: no cookies, read-only exported archive.
   hermes-export-readonly:
     image: alpine:3.22
     command: ["sh", "-c", "find /exports -maxdepth 2 -type f | head"]
