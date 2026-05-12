@@ -3,8 +3,10 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ecylmz/xvault/internal/config"
@@ -95,6 +97,50 @@ func TestBackupVerifyRejectsInvalidDatabase(t *testing.T) {
 	if code == 0 {
 		t.Fatal("expected invalid backup verification to fail")
 	}
+}
+
+func TestServiceExamplesIncludeBookmarksAndLikes(t *testing.T) {
+	code, out := executeCaptureStdout(t, []string{"service", "cron", "print"})
+	if code != 0 {
+		t.Fatalf("exit code = %d output=%s", code, out)
+	}
+	for _, want := range []string{"sync bookmarks --count 300 --max-pages 5 --json", "sync likes --count 300 --max-pages 5 --json"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("cron output missing %q: %s", want, out)
+		}
+	}
+	code, out = executeCaptureStdout(t, []string{"service", "systemd", "print", "--user"})
+	if code != 0 {
+		t.Fatalf("exit code = %d output=%s", code, out)
+	}
+	for _, want := range []string{"xvault-bookmarks.service", "xvault-likes.service", "sync bookmarks --count 300 --max-pages 5 --json", "sync likes --count 300 --max-pages 5 --json"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("systemd output missing %q: %s", want, out)
+		}
+	}
+}
+
+func executeCaptureStdout(t *testing.T, args []string) (int, string) {
+	t.Helper()
+	orig := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+	defer func() { os.Stdout = orig }()
+	code := Execute(args)
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return code, string(out)
 }
 
 func TestErrorEnvelopeDoesNotLeakKnownSecretWords(t *testing.T) {
