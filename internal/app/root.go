@@ -469,6 +469,8 @@ func syncCmd(st *state) *cobra.Command {
 		threadsExpanded := 0
 		threadsSkipped := 0
 		countChanged := cmd.Flags().Changed("count")
+		threadLimitChanged := cmd.Flags().Changed("thread-limit")
+		expansionLimit := syncThreadLimit(st.cfg, threadMode, threadLimit, threadLimitChanged)
 		for _, col := range collections {
 			reqCount, reqAll := syncCountForCollection(st.cfg, col, count, all, countChanged)
 			folderID := ""
@@ -485,12 +487,12 @@ func syncCmd(st *state) *cobra.Command {
 				return err
 			}
 			if withThreads {
-				ids, err := s.CollectionTweetIDs(cmd.Context(), col, threadLimit)
+				ids, err := s.CollectionTweetIDs(cmd.Context(), col, expansionLimit)
 				if err != nil {
 					return err
 				}
 				for _, id := range ids {
-					shouldExpand, err := s.ShouldExpandThread(cmd.Context(), id, threadMode, threadLimit, refreshThreads)
+					shouldExpand, err := s.ShouldExpandThread(cmd.Context(), id, threadMode, expansionLimit, refreshThreads)
 					if err != nil {
 						return err
 					}
@@ -501,16 +503,16 @@ func syncCmd(st *state) *cobra.Command {
 					if err := expandTweetDetail(cmd.Context(), st, s, id, threadMode); err != nil {
 						return err
 					}
-					if _, err := s.Thread(cmd.Context(), id, threadMode, threadLimit); err != nil {
+					if _, err := s.Thread(cmd.Context(), id, threadMode, expansionLimit); err != nil {
 						return err
 					}
 					threadsExpanded++
 				}
 			}
 		}
-		data := map[string]any{"results": results, "with_threads": withThreads, "threads_expanded": threadsExpanded, "threads_skipped": threadsSkipped, "refresh_threads": refreshThreads, "thread_mode": threadMode, "thread_limit": threadLimit}
+		data := map[string]any{"results": results, "with_threads": withThreads, "threads_expanded": threadsExpanded, "threads_skipped": threadsSkipped, "refresh_threads": refreshThreads, "thread_mode": threadMode, "thread_limit": expansionLimit}
 		if len(results) == 1 {
-			data = map[string]any{"result": results[0], "with_threads": withThreads, "threads_expanded": threadsExpanded, "threads_skipped": threadsSkipped, "refresh_threads": refreshThreads, "thread_mode": threadMode, "thread_limit": threadLimit}
+			data = map[string]any{"result": results[0], "with_threads": withThreads, "threads_expanded": threadsExpanded, "threads_skipped": threadsSkipped, "refresh_threads": refreshThreads, "thread_mode": threadMode, "thread_limit": expansionLimit}
 		}
 		if st.json {
 			writeJSON(os.Stdout, "sync", st.started, data)
@@ -655,6 +657,19 @@ func syncCountForCollection(cfg config.Config, collection string, flagCount int,
 		return 0, true
 	}
 	return count, false
+}
+
+func syncThreadLimit(cfg config.Config, mode string, flagLimit int, limitChanged bool) int {
+	if limitChanged {
+		return flagLimit
+	}
+	if mode == "conversation" && cfg.Sync.DefaultConversationLimit > 0 {
+		return cfg.Sync.DefaultConversationLimit
+	}
+	if cfg.Sync.DefaultThreadLimit > 0 {
+		return cfg.Sync.DefaultThreadLimit
+	}
+	return flagLimit
 }
 
 func searchCmd(st *state) *cobra.Command {

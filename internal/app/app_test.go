@@ -75,6 +75,19 @@ func TestVerifyArchiveSucceedsForQueryableBookmarksAndLikes(t *testing.T) {
 	}
 }
 
+func TestSyncThreadLimitUsesConversationDefault(t *testing.T) {
+	cfg := config.Default()
+	if got := syncThreadLimit(cfg, "conversation", 200, false); got != cfg.Sync.DefaultConversationLimit {
+		t.Fatalf("conversation default limit = %d", got)
+	}
+	if got := syncThreadLimit(cfg, "conversation", 42, true); got != 42 {
+		t.Fatalf("explicit conversation limit = %d", got)
+	}
+	if got := syncThreadLimit(cfg, "thread", 200, false); got != cfg.Sync.DefaultThreadLimit {
+		t.Fatalf("thread default limit = %d", got)
+	}
+}
+
 func TestDoctorDefaultDoesNotFailWhenChecksFail(t *testing.T) {
 	dir := t.TempDir()
 	db := filepath.Join(dir, "doctor.sqlite")
