@@ -44,7 +44,8 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	if data, err := Markdown(ctx, st, "all", mdDir, true); err != nil || data["count"] != 1 {
 		t.Fatalf("markdown data=%#v err=%v", data, err)
 	}
-	for _, path := range []string{jsonPath, csvPath, htmlPath, filepath.Join(mdDir, "index.jsonl")} {
+	mdPath := filepath.Join(mdDir, "bookmarks", "2026", "2026-01-01-10001-alice.md")
+	for _, path := range []string{jsonPath, csvPath, htmlPath, filepath.Join(mdDir, "index.jsonl"), mdPath} {
 		b, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
@@ -59,6 +60,29 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	}
 	if !strings.Contains(string(htmlDoc), "data.flatMap") || strings.Contains(string(htmlDoc), "<option>bookmark</option>") {
 		t.Fatalf("html collection filter is not data-driven")
+	}
+	mdDoc, err := os.ReadFile(mdPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(mdDoc), "collections:\n  - \"bookmark\"") {
+		t.Fatalf("markdown front matter collections invalid: %s", mdDoc)
+	}
+	indexDoc, err := os.ReadFile(filepath.Join(mdDir, "index.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(indexDoc), filepath.ToSlash("bookmarks/2026/2026-01-01-10001-alice.md")) {
+		t.Fatalf("index path is not stable year layout: %s", indexDoc)
+	}
+}
+
+func TestMarkdownPathUsesTwitterDateYearLayout(t *testing.T) {
+	if got := safeName("Wed Sep 18 12:56:31 +0000 2024", "1836388833698680949", "JinaAI_"); got != "2024-09-18-1836388833698680949-JinaAI_" {
+		t.Fatalf("safe name = %q", got)
+	}
+	if got := exportYear("Wed Sep 18 12:56:31 +0000 2024"); got != "2024" {
+		t.Fatalf("year = %q", got)
 	}
 }
 

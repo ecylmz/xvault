@@ -83,12 +83,13 @@ func MarkdownWithFolder(ctx context.Context, st *store.Store, collection, folder
 	}
 	var index strings.Builder
 	for _, r := range results {
-		dir := filepath.Join(output, collectionDir(r.Collections, collection))
+		relDir := filepath.Join(collectionDir(r.Collections, collection), exportYear(r.CreatedAt))
+		dir := filepath.Join(output, relDir)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, err
 		}
 		name := safeName(r.CreatedAt, r.TweetID, r.AuthorUsername) + ".md"
-		rel := filepath.Join(collectionDir(r.Collections, collection), name)
+		rel := filepath.Join(relDir, name)
 		body := markdownDoc(r)
 		if err := os.WriteFile(filepath.Join(output, rel), []byte(body), 0o644); err != nil {
 			return nil, err
@@ -162,15 +163,20 @@ func writeFile(path string, b []byte) error {
 }
 
 func markdownDoc(r model.SearchResult) string {
-	return fmt.Sprintf("---\ntweet_id: %q\nurl: %q\nauthor_username: %q\nauthor_display_name: %q\ncreated_at: %q\ncollections: [%q]\nbookmark_folder: %q\nhas_media: %v\nhas_links: %v\nquoted_tweet_id: %q\nconversation_id: %q\n---\n\n%s\n\n## Source\n\n%s\n",
-		r.TweetID, r.URL, r.AuthorUsername, r.AuthorDisplayName, r.CreatedAt, strings.Join(r.Collections, `","`), r.BookmarkFolderName, r.HasMedia, r.HasLinks, r.QuotedTweetID, r.ConversationID, r.TextPreview, r.URL)
+	var collections strings.Builder
+	for _, c := range r.Collections {
+		collections.WriteString("\n  - ")
+		collections.WriteString(strconvQuote(c))
+	}
+	if collections.Len() == 0 {
+		collections.WriteString(" []")
+	}
+	return fmt.Sprintf("---\ntweet_id: %q\nurl: %q\nauthor_username: %q\nauthor_display_name: %q\ncreated_at: %q\ncollections:%s\nbookmark_folder: %q\nhas_media: %v\nhas_links: %v\nquoted_tweet_id: %q\nconversation_id: %q\n---\n\n%s\n\n## Source\n\n%s\n",
+		r.TweetID, r.URL, r.AuthorUsername, r.AuthorDisplayName, r.CreatedAt, collections.String(), r.BookmarkFolderName, r.HasMedia, r.HasLinks, r.QuotedTweetID, r.ConversationID, r.TextPreview, r.URL)
 }
 
 func safeName(created, id, author string) string {
-	date := "undated"
-	if len(created) >= 10 {
-		date = created[:10]
-	}
+	date, _ := exportDateParts(created)
 	base := date + "-" + id
 	if author != "" {
 		base += "-" + author
@@ -196,6 +202,26 @@ func collectionDir(cols []string, fallback string) string {
 		return cols[0] + "s"
 	}
 	return "all"
+}
+
+func exportYear(created string) string {
+	_, year := exportDateParts(created)
+	return year
+}
+
+func exportDateParts(created string) (string, string) {
+	if t, err := time.Parse(time.RFC3339, created); err == nil {
+		return t.UTC().Format("2006-01-02"), t.UTC().Format("2006")
+	}
+	if t, err := time.Parse("Mon Jan 02 15:04:05 -0700 2006", created); err == nil {
+		return t.UTC().Format("2006-01-02"), t.UTC().Format("2006")
+	}
+	return "undated", "undated"
+}
+
+func strconvQuote(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }
 
 func Escape(s string) string { return html.EscapeString(s) }
