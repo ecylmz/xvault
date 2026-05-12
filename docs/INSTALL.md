@@ -43,6 +43,7 @@ Use `--auth-source` to test or run with a specific source without editing config
 
 ```bash
 xvault --auth-source firefox auth test --json
+xvault --auth-source macos_keychain auth test --json
 xvault --auth-source chrome sync bookmarks --count 100 --max-pages 2 --json
 ```
 

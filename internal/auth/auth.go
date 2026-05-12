@@ -30,7 +30,6 @@ func RedactSecret(s string) string {
 }
 
 func Resolve(ctx context.Context, cfg config.Config) (Cookies, Source, error) {
-	_ = ctx
 	for _, src := range cfg.Auth.Sources {
 		switch src {
 		case "env":
@@ -56,6 +55,10 @@ func Resolve(ctx context.Context, cfg config.Config) (Cookies, Source, error) {
 		case "chrome":
 			if c, err := ResolveChrome(ctx); err == nil && c.AuthToken != "" && c.CT0 != "" {
 				return c, Source{Name: "chrome"}, nil
+			}
+		case "macos_keychain":
+			if c, err := ResolveMacOSKeychain(ctx); err == nil && c.AuthToken != "" && c.CT0 != "" {
+				return c, Source{Name: "macos_keychain"}, nil
 			}
 		}
 	}
