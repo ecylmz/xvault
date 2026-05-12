@@ -1,7 +1,7 @@
 # Security Policy
 
-X session cookies are account credentials. Do not share `auth_token`, `ct0`, `twid`, dotenv files, browser cookie databases, raw payloads, or local SQLite archives in public issues, logs, screenshots, or commits.
+See [`docs/SECURITY.md`](docs/SECURITY.md) for cookie handling, redaction,
+agent isolation, and responsible use guidance.
 
-For setup and operating rules, see [docs/SECURITY.md](docs/SECURITY.md).
-
-If you need to report a security issue, use GitHub private vulnerability reporting when it is enabled for the repository. If it is not enabled, contact the maintainer out of band and include only redacted command output.
+Please do not report issues with real cookies, raw database rows, screenshots
+containing secrets, or unredacted diagnostic output.

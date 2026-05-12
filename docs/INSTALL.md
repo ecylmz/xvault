@@ -1,5 +1,45 @@
 # Installation
 
+## Release Binaries
+
+Download the matching binary and checksum from the
+[latest release](https://github.com/ecylmz/xvault/releases/latest).
+
+| Platform | Binary |
+|---|---|
+| macOS Apple Silicon | `xvault-darwin-arm64` |
+| macOS Intel | `xvault-darwin-amd64` |
+| Linux x86_64 | `xvault-linux-amd64` |
+| Linux arm64 | `xvault-linux-arm64` |
+
+macOS Apple Silicon example:
+
+```bash
+base=https://github.com/ecylmz/xvault/releases/latest/download
+curl -LO "$base/xvault-darwin-arm64"
+curl -LO "$base/xvault-darwin-arm64.sha256"
+shasum -a 256 -c xvault-darwin-arm64.sha256
+chmod +x xvault-darwin-arm64
+xattr -d com.apple.quarantine xvault-darwin-arm64 2>/dev/null || true
+sudo mv xvault-darwin-arm64 /usr/local/bin/xvault
+xvault version --json
+```
+
+Linux x86_64 example:
+
+```bash
+base=https://github.com/ecylmz/xvault/releases/latest/download
+curl -LO "$base/xvault-linux-amd64"
+curl -LO "$base/xvault-linux-amd64.sha256"
+sha256sum -c xvault-linux-amd64.sha256
+chmod +x xvault-linux-amd64
+sudo mv xvault-linux-amd64 /usr/local/bin/xvault
+xvault version --json
+```
+
+Install to another directory on `PATH`, such as `~/.local/bin`, if
+`/usr/local/bin` is not writable or not on your `PATH`.
+
 ## From Source
 
 ```bash
@@ -37,9 +77,12 @@ EOF
 chmod 600 ~/.config/xvault/.env
 ```
 
-`xvault` also attempts best-effort browser extraction from Firefox and Chrome/Chromium. On macOS, Chrome/Chromium encrypted `v10` cookies require access to the browser Safe Storage item in Keychain.
+`xvault` also attempts best-effort browser extraction from Firefox and
+Chrome/Chromium. On macOS, Chrome/Chromium encrypted `v10` cookies require
+access to the browser Safe Storage item in Keychain.
 
-Use `--auth-source` to test or run with a specific source without editing config:
+Use `--auth-source` to test or run with a specific source without editing
+config:
 
 ```bash
 xvault --auth-source firefox auth test --json
