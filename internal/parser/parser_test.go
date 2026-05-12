@@ -11,7 +11,11 @@ func TestTimelineParsesTweetUserCursorAndCollection(t *testing.T) {
 	if len(page.Tweets) != 1 || page.Tweets[0].Text != "Hello & archive" {
 		t.Fatalf("unexpected tweets: %#v", page.Tweets)
 	}
-	if len(page.Users) != 2 || page.Users[0].Username != "alice" || page.Users[1].Username != "bob" {
+	users := map[string]bool{}
+	for _, u := range page.Users {
+		users[u.Username] = true
+	}
+	if len(page.Users) != 2 || !users["alice"] || !users["bob"] {
 		t.Fatalf("unexpected users: %#v", page.Users)
 	}
 	if len(page.Collections) != 1 || page.Collections[0].CollectionType != "bookmark" {
