@@ -37,6 +37,10 @@ xvault --auth-source chrome auth test --json
 xvault --auth-source firefox auth test --json
 xvault sync likes --count 100 --max-pages 2 --json
 xvault sync bookmarks --count 100 --max-pages 2 --json
+xvault sync tweets --count 100 --max-pages 2 --json
+xvault sync posts --count 100 --max-pages 2 --json
+xvault sync replies --count 100 --max-pages 2 --json
+xvault sync reposts --count 100 --max-pages 2 --json
 xvault sync bookmarks --all --json
 xvault sync likes --all --json
 xvault sync feed --hours 24 --count 100 --max-pages 2 --json
@@ -76,6 +80,10 @@ Prefer bounded syncs for routine agent work:
 ```bash
 xvault sync bookmarks --count 100 --max-pages 2 --json
 xvault sync likes --count 100 --max-pages 2 --json
+xvault sync tweets --count 100 --max-pages 2 --json
+xvault sync posts --count 100 --max-pages 2 --json
+xvault sync replies --count 100 --max-pages 2 --json
+xvault sync reposts --count 100 --max-pages 2 --json
 ```
 
 Use full syncs only when explicitly asked to refresh the complete saved archive:
