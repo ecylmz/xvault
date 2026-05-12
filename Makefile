@@ -42,6 +42,12 @@ verify-archive:
 	go build -o bin/xvault ./cmd/xvault
 	bin/xvault verify-archive --json
 
+.PHONY: docker-check
+docker-check:
+	docker version >/dev/null
+	docker build -t xvault:local .
+	docker run --rm xvault:local version --json
+
 .PHONY: publish-check
 publish-check: ci lint build cross-build verify-archive
 

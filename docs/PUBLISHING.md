@@ -11,8 +11,7 @@ make publish-check
 If Docker is available locally, also verify the container image:
 
 ```bash
-docker build -t xvault:local .
-docker run --rm xvault:local version --json
+make docker-check
 ```
 
 Create the GitHub repository only when you are ready for the project to become visible:
