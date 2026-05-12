@@ -169,6 +169,20 @@ func TestErrorEnvelopeDoesNotLeakKnownSecretWords(t *testing.T) {
 	_ = os.Stdout
 }
 
+func TestConfigSetErrorDoesNotEchoSecretValue(t *testing.T) {
+	dir := t.TempDir()
+	code, out := executeCaptureStdout(t, []string{"--config", filepath.Join(dir, "config.toml"), "config", "set", "auth.auth_token", "SECRET_VALUE", "--json"})
+	if code == 0 {
+		t.Fatal("expected unsupported secret config key to fail")
+	}
+	if strings.Contains(out, "SECRET_VALUE") {
+		t.Fatalf("secret value leaked in output: %s", out)
+	}
+	if !strings.Contains(out, `"command":"config set"`) {
+		t.Fatalf("unexpected command envelope: %s", out)
+	}
+}
+
 func TestSyncCountForCollectionUsesConfigDefaults(t *testing.T) {
 	cfg := config.Default()
 	count, all := syncCountForCollection(cfg, "likes", 100, false, false)
@@ -197,5 +211,21 @@ func TestInvokedCommandKeepsBooleanFlagsFromEatingCommands(t *testing.T) {
 	got = invokedCommand([]string{"auth", "import-browser", "--force", "--source", "chrome", "--json"})
 	if got != "auth import-browser" {
 		t.Fatalf("force command = %q", got)
+	}
+	got = invokedCommand([]string{"config", "set", "auth.auth_token", "SECRET_VALUE", "--json"})
+	if got != "config set" {
+		t.Fatalf("config set command = %q", got)
+	}
+	got = invokedCommand([]string{"search", "private query text", "--json"})
+	if got != "search" {
+		t.Fatalf("search command = %q", got)
+	}
+	got = invokedCommand([]string{"backup", "verify", "/private/path/archive.sqlite", "--json"})
+	if got != "backup verify" {
+		t.Fatalf("backup verify command = %q", got)
+	}
+	got = invokedCommand([]string{"service", "systemd", "print", "--user"})
+	if got != "service systemd print" {
+		t.Fatalf("service command = %q", got)
 	}
 }

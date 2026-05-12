@@ -1365,7 +1365,26 @@ func sanitizeErr(err error) string {
 }
 
 func invokedCommand(args []string) string {
-	parts := []string{}
+	tokens := commandTokens(args)
+	if len(tokens) == 0 {
+		return "xvault"
+	}
+	top := tokens[0]
+	if !knownTopCommand(top) {
+		return top
+	}
+	parts := []string{top}
+	if len(tokens) > 1 && knownSubcommand(top, tokens[1]) {
+		parts = append(parts, tokens[1])
+		if len(tokens) > 2 && knownNestedSubcommand(top, tokens[1], tokens[2]) {
+			parts = append(parts, tokens[2])
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func commandTokens(args []string) []string {
+	tokens := []string{}
 	skipNext := false
 	for _, arg := range args {
 		if skipNext {
@@ -1378,12 +1397,54 @@ func invokedCommand(args []string) string {
 			}
 			continue
 		}
-		parts = append(parts, arg)
+		tokens = append(tokens, arg)
 	}
-	if len(parts) == 0 {
-		return "xvault"
+	return tokens
+}
+
+func knownTopCommand(command string) bool {
+	switch command {
+	case "auth", "backup", "bookmarks", "completion", "config", "conversation", "count", "db", "doctor", "export", "help", "init", "open", "refresh-ids", "search", "service", "show", "show-url", "stats", "status", "sync", "thread", "vacuum", "verify-archive", "version":
+		return true
+	default:
+		return false
 	}
-	return strings.Join(parts, " ")
+}
+
+func knownSubcommand(command, subcommand string) bool {
+	switch command {
+	case "auth":
+		return inSet(subcommand, "import-browser", "import-env", "sources", "status", "test")
+	case "backup":
+		return inSet(subcommand, "create", "list", "verify")
+	case "bookmarks":
+		return subcommand == "folders"
+	case "config":
+		return inSet(subcommand, "get", "set", "show")
+	case "db":
+		return inSet(subcommand, "integrity", "migrate", "rebuild-fts")
+	case "export":
+		return inSet(subcommand, "csv", "hermes", "html", "json", "markdown", "obsidian")
+	case "service":
+		return inSet(subcommand, "cron", "systemd")
+	case "sync":
+		return inSet(subcommand, "bookmarks", "checkpoints", "feed", "likes", "posts", "replies", "reposts", "runs", "sanitize-runs", "summary", "tweets")
+	default:
+		return false
+	}
+}
+
+func knownNestedSubcommand(command, subcommand, nested string) bool {
+	return command == "service" && inSet(subcommand, "cron", "systemd") && nested == "print"
+}
+
+func inSet(value string, options ...string) bool {
+	for _, option := range options {
+		if value == option {
+			return true
+		}
+	}
+	return false
 }
 
 func boolFlag(arg string) bool {
