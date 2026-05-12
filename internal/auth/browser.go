@@ -23,6 +23,8 @@ func resolveBrowserCookies(ctx context.Context, name string) (Cookies, error) {
 		return ResolveFirefox(ctx)
 	case "chrome", "chrome_linux", "chrome_macos":
 		return ResolveChrome(ctx)
+	case "macos_keychain":
+		return ResolveMacOSKeychain(ctx)
 	default:
 		return Cookies{}, ErrMissing
 	}

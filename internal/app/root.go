@@ -74,7 +74,7 @@ func Execute(args []string) int {
 	root.PersistentFlags().BoolVar(&st.json, "json", false, "emit a single JSON object")
 	root.PersistentFlags().StringVar(&st.config, "config", "", "config file path")
 	root.PersistentFlags().StringVar(&st.db, "db", "", "SQLite database path")
-	root.PersistentFlags().StringSliceVar(&st.authSrc, "auth-source", nil, "override auth source order (repeat or comma-separate: env,dotenv,firefox,chrome)")
+	root.PersistentFlags().StringSliceVar(&st.authSrc, "auth-source", nil, "override auth source order (repeat or comma-separate: env,dotenv,config,firefox,chrome,macos_keychain)")
 	root.PersistentFlags().StringVar(&st.profile, "profile", "", "profile name")
 	root.PersistentFlags().BoolVar(&st.quiet, "quiet", false, "reduce human output")
 	root.PersistentFlags().BoolVar(&st.verbose, "verbose", false, "increase diagnostics")
