@@ -54,12 +54,12 @@ func readFirefoxCookies(ctx context.Context, path string) (Cookies, error) {
 	if err != nil {
 		return Cookies{}, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	rows, err := db.QueryContext(ctx, `SELECT name, value FROM moz_cookies WHERE (host LIKE '%.x.com' OR host = 'x.com' OR host LIKE '%.twitter.com' OR host = 'twitter.com') AND name IN ('auth_token','ct0','twid')`)
 	if err != nil {
 		return Cookies{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	values := map[string]string{}
 	for rows.Next() {
 		var name, value string

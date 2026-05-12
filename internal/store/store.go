@@ -280,7 +280,7 @@ func (s *Store) RebuildFTS(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var tw model.Tweet
 		if err := rows.Scan(&tw.ID, &tw.Text, &tw.AuthorUsername, &tw.AuthorDisplayName); err != nil {
@@ -368,7 +368,7 @@ FROM tweets t LEFT JOIN users u ON u.id=t.author_id LEFT JOIN tweets qt ON qt.id
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []model.SearchResult{}
 	for rows.Next() {
 		var r model.SearchResult
@@ -446,7 +446,7 @@ func (s *Store) tweetURLs(ctx context.Context, tweetID string) ([]model.URL, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []model.URL{}
 	for rows.Next() {
 		u := model.URL{TweetID: tweetID}
@@ -463,7 +463,7 @@ func (s *Store) tweetMedia(ctx context.Context, tweetID string) ([]model.Media, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []model.Media{}
 	for rows.Next() {
 		m := model.Media{TweetID: tweetID}
@@ -480,7 +480,7 @@ func (s *Store) tweetMentions(ctx context.Context, tweetID string) ([]model.Ment
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []model.Mention{}
 	for rows.Next() {
 		m := model.Mention{TweetID: tweetID}
@@ -497,7 +497,7 @@ func (s *Store) tweetHashtags(ctx context.Context, tweetID string) ([]model.Hash
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []model.Hashtag{}
 	for rows.Next() {
 		h := model.Hashtag{TweetID: tweetID}
@@ -515,7 +515,7 @@ FROM threads th JOIN thread_tweets tt ON tt.thread_id=th.id WHERE tt.tweet_id=? 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []map[string]any{}
 	for rows.Next() {
 		var id, threadType, mode, focalID, conversationID, role string
@@ -607,7 +607,7 @@ func (s *Store) RawPayload(ctx context.Context, id string) (json.RawMessage, err
 		if err != nil {
 			return nil, err
 		}
-		defer gr.Close()
+		defer func() { _ = gr.Close() }()
 		payload, err = io.ReadAll(gr)
 		if err != nil {
 			return nil, err
@@ -635,7 +635,7 @@ func (s *Store) CollectionTweetIDs(ctx context.Context, collection string, limit
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var ids []string
 	for rows.Next() {
 		var id string
@@ -674,7 +674,7 @@ FROM tweets t LEFT JOIN users u ON u.id=t.author_id WHERE `+where+` ORDER BY COA
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := []map[string]any{}
 	for rows.Next() {
 		var id, text, username, display, created, conv string
@@ -825,7 +825,7 @@ func (s *Store) collections(ctx context.Context, tweetID string) ([]string, stri
 	if err != nil {
 		return nil, ""
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var cols []string
 	var folder string
 	for rows.Next() {
@@ -852,7 +852,7 @@ func (s *Store) Stats(ctx context.Context) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	collections := map[string]int64{}
 	for rows.Next() {
 		var k string
@@ -894,7 +894,7 @@ func (s *Store) Stats(ctx context.Context) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer folderRows.Close()
+	defer func() { _ = folderRows.Close() }()
 	for folderRows.Next() {
 		var name string
 		var count int64
@@ -944,7 +944,7 @@ func (s *Store) lastSyncByCollection(ctx context.Context, successOnly bool) (map
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := map[string]string{}
 	for rows.Next() {
 		var collection, at string
@@ -966,7 +966,7 @@ ORDER BY 2`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []BookmarkFolder{}
 	for rows.Next() {
 		var f BookmarkFolder
@@ -1069,7 +1069,7 @@ func (s *Store) ListCheckpoints(ctx context.Context) ([]Checkpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []Checkpoint{}
 	for rows.Next() {
 		var cp Checkpoint
@@ -1149,7 +1149,7 @@ FROM sync_runs WHERE `+strings.Join(where, " AND ")+` ORDER BY started_at DESC, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []SyncRun
 	for rows.Next() {
 		var run SyncRun
@@ -1180,7 +1180,7 @@ ORDER BY f.started_at DESC, f.id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []SyncRun
 	for rows.Next() {
 		var run SyncRun

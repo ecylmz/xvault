@@ -66,6 +66,16 @@ bin/xvault sync likes --count 100 --max-pages 2 --json
 bin/xvault search "llm agents" --source all --limit 10 --json
 ```
 
+## Local Data
+
+By default, `xvault` stores its SQLite archive at:
+
+```text
+~/.local/share/xvault/xvault.sqlite
+```
+
+The default config file is `~/.config/xvault/config.toml`, and the default dotenv auth file is `~/.config/xvault/.env`. Query and maintain the archive through `xvault` commands such as `search`, `show`, `count`, `stats`, `db integrity`, and `db rebuild-fts`; do not edit the SQLite database directly unless you are developing a migration.
+
 ## Full Likes And Bookmarks Archive
 
 After `auth test` succeeds, sync the complete local archive for the two primary saved collections:
@@ -118,6 +128,16 @@ xvault conversation TWEET_ID --json
 ```
 
 See `docs/PUBLISHING.md` for GitHub release and container verification steps.
+
+## Releases
+
+Release notes live in `CHANGELOG.md`. To publish a version, add a matching changelog section and run:
+
+```bash
+make release VERSION=v0.1.0
+```
+
+The release workflow builds static binaries for Linux and macOS on `amd64` and `arm64`, publishes `.sha256` checksum files, and uses the matching `CHANGELOG.md` section as the GitHub release notes.
 
 ## Limitations
 

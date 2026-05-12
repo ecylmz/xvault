@@ -23,7 +23,7 @@ func TestSyncLikesWithReplayServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/i/api/graphql/test-likes/Likes" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -74,7 +74,7 @@ func TestSyncBookmarkFolderUsesFolderTimelineAndMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	var folderID string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/i/api/graphql/test-folder/BookmarkFolderTimeline" {
@@ -114,7 +114,7 @@ func TestSyncStopsOnRepeatedCursor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 		_, _ = w.Write([]byte(`[{"__typename":"Tweet","rest_id":"10001","core":{"user_results":{"result":{"rest_id":"20001","core":{"screen_name":"alice","name":"Alice"}}}},"legacy":{"full_text":"same cursor tweet","user_id_str":"20001","conversation_id_str":"10001"}},{"entryType":"TimelineTimelineCursor","cursorType":"Bottom","value":"CURSOR"}]`))
@@ -138,7 +138,7 @@ func TestSyncPersistsAndResumesCheckpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	var seenCursorOnResume bool
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +198,7 @@ func TestSyncFeedStopsAfterTwoPagesOlderThanBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
@@ -235,7 +235,7 @@ func TestSyncRunStoresSanitizedFailureMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"errors":[{"message":"Could not authenticate you","code":32}]}`, http.StatusUnauthorized)
 	}))

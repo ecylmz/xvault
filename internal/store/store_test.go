@@ -16,7 +16,7 @@ func TestStoreUpsertSearchAndCollections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	page := model.ParsedPage{
 		Users:       []model.User{{ID: "u1", Username: "alice", DisplayName: "Alice"}},
 		Tweets:      []model.Tweet{{ID: "10001", Text: "defect prediction archive", AuthorID: "u1", AuthorUsername: "alice", AuthorDisplayName: "Alice", CreatedAt: "2026-05-11T12:00:00Z"}},
@@ -112,7 +112,7 @@ CREATE TABLE urls (id INTEGER PRIMARY KEY AUTOINCREMENT, tweet_id TEXT NOT NULL,
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	for _, table := range []string{"tweets_fts", "tweets_fts_map", "threads", "thread_tweets", "raw_payloads", "sync_runs", "sync_checkpoints", "mentions", "hashtags"} {
 		var name string
 		if err := s.DB().QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE name=?`, table).Scan(&name); err != nil {
@@ -134,7 +134,7 @@ func TestTombstoneDoesNotOverwriteRealTweet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	real := model.ParsedPage{Users: []model.User{{ID: "u1"}}, Tweets: []model.Tweet{{ID: "10001", Text: "real text", AuthorID: "u1"}}}
 	tomb := model.ParsedPage{Tweets: []model.Tweet{{ID: "10001", Text: "[Tweet unavailable]", AuthorID: "u1", IsTombstone: true, TombstoneReason: "deleted"}}}
 	if err := s.UpsertPage(ctx, real); err != nil {
@@ -158,7 +158,7 @@ func TestRealTweetReplacesTombstone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	tomb := model.ParsedPage{Tweets: []model.Tweet{{ID: "10001", Text: "[Tweet unavailable]", AuthorID: "u1", IsTombstone: true, TombstoneReason: "deleted"}}}
 	real := model.ParsedPage{Users: []model.User{{ID: "u1", Username: "alice"}}, Tweets: []model.Tweet{{ID: "10001", Text: "real text", AuthorID: "u1", AuthorUsername: "alice"}}}
 	if err := s.UpsertPage(ctx, tomb); err != nil {
@@ -189,7 +189,7 @@ func TestShowByURLThreadAndVacuum(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	page := model.ParsedPage{
 		Users: []model.User{{ID: "u1", Username: "alice", DisplayName: "Alice"}},
 		Tweets: []model.Tweet{
@@ -267,7 +267,7 @@ func TestShowIncludesLinksMediaAndQuotedSummary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	page := model.ParsedPage{
 		Users: []model.User{{ID: "u1", Username: "alice", DisplayName: "Alice"}, {ID: "u2", Username: "bob", DisplayName: "Bob"}},
 		Tweets: []model.Tweet{
@@ -332,7 +332,7 @@ func TestSearchWithMediaAndLinkFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	page := model.ParsedPage{
 		Users:       []model.User{{ID: "u1", Username: "alice"}},
 		Tweets:      []model.Tweet{{ID: "10001", Text: "filter fixture", AuthorID: "u1", CreatedAt: "2026-01-01T00:00:00Z"}},
@@ -361,7 +361,7 @@ func TestSearchRankingUsesCollectionPriority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	page := model.ParsedPage{
 		Users: []model.User{{ID: "u1", Username: "alice"}},
 		Tweets: []model.Tweet{
@@ -394,7 +394,7 @@ func TestRawPayloadRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	id, err := s.SaveRaw(ctx, "graphql", "Test", []byte(`{"ok":true}`))
 	if err != nil {
 		t.Fatal(err)
@@ -414,7 +414,7 @@ func TestCheckpointRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	cp := Checkpoint{
 		CollectionType: "bookmark",
 		Cursor:         "CURSOR-1",
@@ -453,7 +453,7 @@ func TestSyncRunLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	id, err := st.StartSyncRun(ctx, "like", "incremental")
 	if err != nil {
 		t.Fatal(err)

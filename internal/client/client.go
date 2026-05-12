@@ -156,7 +156,7 @@ func (c *Client) PostJSON(ctx context.Context, path string, payload any) ([]byte
 	if err != nil {
 		return nil, 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	out, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
 	if err != nil {
 		return nil, resp.StatusCode, err

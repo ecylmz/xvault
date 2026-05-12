@@ -175,7 +175,7 @@ func doctorCmd(st *state) *cobra.Command {
 		if err != nil {
 			add("database", false, err.Error())
 		} else {
-			defer s.Close()
+			defer func() { _ = s.Close() }()
 			if result, err := s.Integrity(cmd.Context()); err != nil {
 				add("database_integrity", false, err.Error())
 			} else {
@@ -628,7 +628,7 @@ func syncCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		x := client.New(client.Options{Auth: cookies, MaxRetries: st.cfg.Sync.MaxRetries})
 		sy := syncer.New(x, s, queryids.Load(""), dbPath, cookies.TWID, time.Duration(st.cfg.Sync.RequestDelayMS)*time.Millisecond)
 		results := []syncer.Result{}
@@ -704,7 +704,7 @@ func syncCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		runs, err := s.ListSyncRuns(c.Context(), runsCollection, runsStatus, runsLimit)
 		if err != nil {
 			return err
@@ -728,7 +728,7 @@ func syncCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		checkpoints, err := s.ListCheckpoints(c.Context())
 		if err != nil {
 			return err
@@ -748,7 +748,7 @@ func syncCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		updated, err := s.SanitizeSyncRunErrors(c.Context())
 		if err != nil {
 			return err
@@ -766,7 +766,7 @@ func syncCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		bookmarks, err := s.CollectionCount(c.Context(), "bookmarks")
 		if err != nil {
 			return err
@@ -852,7 +852,7 @@ func searchCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		query := ""
 		if len(args) > 0 {
 			query = args[0]
@@ -891,7 +891,7 @@ func bookmarksCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		folders, err := s.BookmarkFolders(cmd.Context())
 		if err != nil {
 			return err
@@ -915,7 +915,7 @@ func countCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		count, err := s.CollectionCount(cmd.Context(), args[0])
 		if err != nil {
 			return err
@@ -936,7 +936,7 @@ func verifyArchiveCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		integrity, err := s.Integrity(cmd.Context())
 		if err != nil {
 			return err
@@ -998,7 +998,7 @@ func showCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		data, err := s.Show(cmd.Context(), args[0])
 		if err != nil {
 			return err
@@ -1029,7 +1029,7 @@ func showURLCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		data, err := s.ShowByURL(cmd.Context(), args[0])
 		if err != nil {
 			return err
@@ -1049,7 +1049,7 @@ func openCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		data, err := s.Show(cmd.Context(), args[0])
 		if err != nil {
 			return err
@@ -1079,7 +1079,7 @@ func threadCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		if err := expandTweetDetail(cmd.Context(), st, s, args[0], mode); err != nil {
 			return err
 		}
@@ -1106,7 +1106,7 @@ func conversationCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		if err := expandTweetDetail(cmd.Context(), st, s, args[0], "conversation"); err != nil {
 			return err
 		}
@@ -1183,7 +1183,7 @@ func exportCmd(st *state) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer s.Close()
+			defer func() { _ = s.Close() }()
 			data, err := run(cmd.Context(), s, collection, folder, output)
 			if err != nil {
 				return err
@@ -1214,7 +1214,7 @@ func exportCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		data, err := exporter.JSONWithFolder(cmd.Context(), s, collection, folder, output, pretty)
 		if err != nil {
 			return err
@@ -1244,7 +1244,7 @@ func exportCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		data, err := exporter.HTMLWithFolderOptions(cmd.Context(), s, htmlCollection, htmlFolder, htmlOutput, st.cfg.Export.HTMLWarnSizeMB, htmlFailOnLarge)
 		if err != nil {
 			return err
@@ -1275,7 +1275,7 @@ func exportCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		var data map[string]any
 		switch markdownMode {
 		case "files":
@@ -1318,7 +1318,7 @@ func exportCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		data, err := exporter.ObsidianWithFolder(cmd.Context(), s, obsidianCollection, obsidianFolder, obsidianOutput, obsidianWithIndex)
 		if err != nil {
 			return err
@@ -1345,7 +1345,7 @@ func dbCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		data := map[string]any{"db_path": config.Expand(st.cfg.Database.Path), "migrated": true}
 		if st.json {
 			writeJSON(os.Stdout, "db migrate", st.started, data)
@@ -1359,7 +1359,7 @@ func dbCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		result, err := s.Integrity(cmd.Context())
 		if err != nil {
 			return err
@@ -1383,7 +1383,7 @@ func dbCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		if err := s.RebuildFTS(cmd.Context()); err != nil {
 			return err
 		}
@@ -1404,7 +1404,7 @@ func vacuumCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		if err := s.Vacuum(cmd.Context()); err != nil {
 			return err
 		}
@@ -1423,7 +1423,7 @@ func statsCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		data, err := s.Stats(cmd.Context())
 		if err != nil {
 			return err
@@ -1445,7 +1445,7 @@ func backupCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		data, err := exporter.Backup(cmd.Context(), s, output)
 		if err != nil {
 			return err
@@ -1475,7 +1475,7 @@ func backupCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 		var result string
 		err = db.QueryRowContext(cmd.Context(), "PRAGMA integrity_check").Scan(&result)
 		if err != nil {

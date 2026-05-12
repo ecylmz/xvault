@@ -115,7 +115,7 @@ FROM users u JOIN tweets t ON t.author_id=u.id WHERE t.id IN (`+ph+`) ORDER BY u
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []model.User{}
 	for rows.Next() {
 		var u model.User
@@ -135,7 +135,7 @@ func exportMedia(ctx context.Context, st *store.Store, ph string, args []any) ([
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []model.Media{}
 	for rows.Next() {
 		var m model.Media
@@ -152,7 +152,7 @@ func exportURLs(ctx context.Context, st *store.Store, ph string, args []any) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []model.URL{}
 	for rows.Next() {
 		var u model.URL
@@ -170,7 +170,7 @@ FROM threads th JOIN thread_tweets tt ON tt.thread_id=th.id WHERE tt.tweet_id IN
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []map[string]any{}
 	for rows.Next() {
 		var id, threadType, mode, focalID, conversationID string
@@ -259,7 +259,7 @@ func MarkdownSingleWithFolder(ctx context.Context, st *store.Store, collection, 
 	}
 	var body strings.Builder
 	body.WriteString("# xvault archive\n\n")
-	body.WriteString(fmt.Sprintf("- collection: %s\n- folder: %s\n- count: %d\n- exported_at: %s\n\n", collection, folder, len(results), time.Now().UTC().Format(time.RFC3339)))
+	fmt.Fprintf(&body, "- collection: %s\n- folder: %s\n- count: %d\n- exported_at: %s\n\n", collection, folder, len(results), time.Now().UTC().Format(time.RFC3339))
 	for i, r := range results {
 		if i > 0 {
 			body.WriteString("\n---\n\n")
@@ -489,10 +489,10 @@ func writeObsidianCollectionIndex(output, dirName string, rows []model.SearchRes
 		b.WriteString("No records exported.\n")
 		return os.WriteFile(filepath.Join(output, dirName+".md"), []byte(b.String()), 0o644)
 	}
-	b.WriteString(fmt.Sprintf("%d records exported.\n\n", len(rows)))
+	fmt.Fprintf(&b, "%d records exported.\n\n", len(rows))
 	for _, r := range rows {
 		rel := filepath.ToSlash(filepath.Join(dirName, exportYear(r.CreatedAt), safeName(r.CreatedAt, r.TweetID, r.AuthorUsername)+".md"))
-		b.WriteString(fmt.Sprintf("- [%s](%s) @%s\n", r.TweetID, rel, r.AuthorUsername))
+		fmt.Fprintf(&b, "- [%s](%s) @%s\n", r.TweetID, rel, r.AuthorUsername)
 	}
 	return os.WriteFile(filepath.Join(output, dirName+".md"), []byte(b.String()), 0o644)
 }
@@ -500,11 +500,11 @@ func writeObsidianCollectionIndex(output, dirName string, rows []model.SearchRes
 func writeObsidianAuthorIndex(authorsDir, author string, rows []model.SearchResult) error {
 	var b strings.Builder
 	b.WriteString("# @" + author + "\n\n")
-	b.WriteString(fmt.Sprintf("%d records exported.\n\n", len(rows)))
+	fmt.Fprintf(&b, "%d records exported.\n\n", len(rows))
 	for _, r := range rows {
 		dirName := obsidianCollectionDir(r.Collections, "all")
 		rel := filepath.ToSlash(filepath.Join("..", dirName, exportYear(r.CreatedAt), safeName(r.CreatedAt, r.TweetID, r.AuthorUsername)+".md"))
-		b.WriteString(fmt.Sprintf("- [%s](%s) %s\n", r.TweetID, rel, r.TextPreview))
+		fmt.Fprintf(&b, "- [%s](%s) %s\n", r.TweetID, rel, r.TextPreview)
 	}
 	return os.WriteFile(filepath.Join(authorsDir, safeSegment(author)+".md"), []byte(b.String()), 0o644)
 }

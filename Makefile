@@ -61,6 +61,10 @@ docker-check:
 .PHONY: publish-check
 publish-check: ci lint build cross-build verify-archive
 
+.PHONY: release
+release:
+	sh tools/release.sh "$(VERSION)"
+
 .PHONY: update-golden
 update-golden:
 	UPDATE_GOLDEN=1 go test ./...

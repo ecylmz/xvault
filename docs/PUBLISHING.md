@@ -40,11 +40,12 @@ gh repo create ecylmz/xvault --private --source=. --remote=origin --push
 
 Switch `--private` to `--public` only when docs, credentials, local database files, and generated artifacts have been checked. The repository `.gitignore` excludes dotenv files, binaries, SQLite databases, and build outputs.
 
-To publish a release after the remote exists:
+To publish a release after the remote exists, add release notes to `CHANGELOG.md` under a matching version heading and run:
 
 ```bash
-git tag v0.1.0
-git push origin main v0.1.0
+make release VERSION=v0.1.0
 ```
 
-The release workflow builds Linux and macOS binaries for amd64 and arm64, and publishes matching `.sha256` checksum files.
+`make release` requires a clean working tree, extracts the release notes from `CHANGELOG.md`, runs the local publish gates, builds and verifies local release artifacts, creates an annotated tag, pushes `main` and the tag, waits for the GitHub Release workflow when available, and verifies the created release.
+
+The release workflow builds Linux and macOS binaries for amd64 and arm64, publishes matching `.sha256` checksum files, and uses the matching `CHANGELOG.md` section as the GitHub release notes.

@@ -46,10 +46,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
+      - name: Generate release notes
+        run: sh tools/changelog_notes.sh "${GITHUB_REF_NAME}" > release-notes.md
       - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
+          body_path: release-notes.md
           files: dist/*

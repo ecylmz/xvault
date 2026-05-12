@@ -20,7 +20,7 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	page := model.ParsedPage{
 		Users:       []model.User{{ID: "u1", Username: "alice", DisplayName: "Alice"}},
 		Tweets:      []model.Tweet{{ID: "10001", Text: "export fixture tweet", AuthorID: "u1", AuthorUsername: "alice", AuthorDisplayName: "Alice", ConversationID: "10001", CreatedAt: "2026-01-01T00:00:00Z"}},
@@ -131,7 +131,7 @@ func TestExportFolderFilter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	page := model.ParsedPage{
 		Users: []model.User{{ID: "u1", Username: "alice"}},
 		Tweets: []model.Tweet{
@@ -169,7 +169,7 @@ func TestExportsRenderQuotedTweetContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	page := model.ParsedPage{
 		Users: []model.User{
 			{ID: "u1", Username: "alice", DisplayName: "Alice"},
@@ -215,7 +215,7 @@ func TestHTMLFailOnLarge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	page := model.ParsedPage{
 		Users:       []model.User{{ID: "u1", Username: "alice"}},
 		Tweets:      []model.Tweet{{ID: "10001", Text: "large html fixture", AuthorID: "u1", AuthorUsername: "alice"}},
@@ -265,7 +265,7 @@ func TestBackupCreatesIntegrityCheckedSQLiteCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	page := model.ParsedPage{
 		Users:       []model.User{{ID: "u1", Username: "alice"}},
 		Tweets:      []model.Tweet{{ID: "10001", Text: "backup fixture tweet", AuthorID: "u1", AuthorUsername: "alice"}},
@@ -286,7 +286,7 @@ func TestBackupCreatesIntegrityCheckedSQLiteCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	var integrity string
 	if err := db.QueryRowContext(ctx, "PRAGMA integrity_check").Scan(&integrity); err != nil {
 		t.Fatal(err)

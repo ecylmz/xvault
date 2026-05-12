@@ -72,12 +72,12 @@ func readChromeCookies(ctx context.Context, path string) (Cookies, error) {
 	if err != nil {
 		return Cookies{}, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	rows, err := db.QueryContext(ctx, `SELECT name, value, encrypted_value FROM cookies WHERE (host_key LIKE '%.x.com' OR host_key = 'x.com' OR host_key LIKE '%.twitter.com' OR host_key = 'twitter.com') AND name IN ('auth_token','ct0','twid')`)
 	if err != nil {
 		return Cookies{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	values := map[string]string{}
 	for rows.Next() {
 		var name, value string
