@@ -104,6 +104,10 @@ type SearchResult struct {
 	BookmarkFolderName      string   `json:"bookmark_folder_name,omitempty"`
 	Score                   float64  `json:"score"`
 	TextPreview             string   `json:"text_preview"`
+	ReplyCount              int64    `json:"reply_count"`
+	RepostCount             int64    `json:"repost_count"`
+	LikeCount               int64    `json:"like_count"`
+	QuoteCount              int64    `json:"quote_count"`
 	HasMedia                bool     `json:"has_media"`
 	HasLinks                bool     `json:"has_links"`
 	LocalMarkdownPath       string   `json:"local_markdown_path,omitempty"`

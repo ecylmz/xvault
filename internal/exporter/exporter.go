@@ -194,9 +194,9 @@ func CSVWithFolder(ctx context.Context, st *store.Store, collection, folder, out
 	}
 	var sb strings.Builder
 	w := csv.NewWriter(&sb)
-	_ = w.Write([]string{"tweet_id", "url", "text", "author_username", "author_display_name", "created_at", "collections", "bookmark_folder", "has_media", "has_links", "quoted_tweet_id", "conversation_id"})
+	_ = w.Write([]string{"tweet_id", "url", "text", "author_username", "author_display_name", "created_at", "collections", "bookmark_folder", "reply_count", "repost_count", "like_count", "quote_count", "has_media", "has_links", "quoted_tweet_id", "conversation_id"})
 	for _, r := range results {
-		_ = w.Write([]string{r.TweetID, r.URL, r.TextPreview, r.AuthorUsername, r.AuthorDisplayName, r.CreatedAt, strings.Join(r.Collections, ";"), r.BookmarkFolderName, fmt.Sprint(r.HasMedia), fmt.Sprint(r.HasLinks), r.QuotedTweetID, r.ConversationID})
+		_ = w.Write([]string{r.TweetID, r.URL, r.TextPreview, r.AuthorUsername, r.AuthorDisplayName, r.CreatedAt, strings.Join(r.Collections, ";"), r.BookmarkFolderName, fmt.Sprint(r.ReplyCount), fmt.Sprint(r.RepostCount), fmt.Sprint(r.LikeCount), fmt.Sprint(r.QuoteCount), fmt.Sprint(r.HasMedia), fmt.Sprint(r.HasLinks), r.QuotedTweetID, r.ConversationID})
 	}
 	w.Flush()
 	if output != "" {

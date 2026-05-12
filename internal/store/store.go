@@ -341,6 +341,7 @@ func (s *Store) SearchWithFilters(ctx context.Context, query, source, author, fo
 		where = append(where, "EXISTS(SELECT 1 FROM urls ur WHERE ur.tweet_id=t.id)")
 	}
 	sqlText := `SELECT t.id, t.text, COALESCE(u.username,''), COALESCE(u.display_name,''), COALESCE(t.created_at,''), COALESCE(t.quoted_tweet_id,''), COALESCE(qt.text,''), COALESCE(qu.username,''), COALESCE(qu.display_name,''), COALESCE(t.conversation_id,''),
+t.reply_count, t.retweet_count, t.like_count, t.quote_count,
 EXISTS(SELECT 1 FROM media m WHERE m.tweet_id=t.id), EXISTS(SELECT 1 FROM urls ur WHERE ur.tweet_id=t.id)
 FROM tweets t LEFT JOIN users u ON u.id=t.author_id LEFT JOIN tweets qt ON qt.id=t.quoted_tweet_id AND qt.is_tombstone=0 LEFT JOIN users qu ON qu.id=qt.author_id `
 	if joinFTS {
@@ -356,7 +357,7 @@ FROM tweets t LEFT JOIN users u ON u.id=t.author_id LEFT JOIN tweets qt ON qt.id
 	out := []model.SearchResult{}
 	for rows.Next() {
 		var r model.SearchResult
-		if err := rows.Scan(&r.TweetID, &r.TextPreview, &r.AuthorUsername, &r.AuthorDisplayName, &r.CreatedAt, &r.QuotedTweetID, &r.QuotedTextPreview, &r.QuotedAuthorUsername, &r.QuotedAuthorDisplayName, &r.ConversationID, &r.HasMedia, &r.HasLinks); err != nil {
+		if err := rows.Scan(&r.TweetID, &r.TextPreview, &r.AuthorUsername, &r.AuthorDisplayName, &r.CreatedAt, &r.QuotedTweetID, &r.QuotedTextPreview, &r.QuotedAuthorUsername, &r.QuotedAuthorDisplayName, &r.ConversationID, &r.ReplyCount, &r.RepostCount, &r.LikeCount, &r.QuoteCount, &r.HasMedia, &r.HasLinks); err != nil {
 			return nil, err
 		}
 		r.URL = CanonicalURL(r.AuthorUsername, r.TweetID)

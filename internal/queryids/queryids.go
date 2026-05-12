@@ -31,9 +31,12 @@ var fallback = map[string]string{
 	"BookmarkSearchTimeline": "Nikib-QgCS0D_GU_YI8gBQ",
 	"BookmarkFolderTimeline": "Lx3ZL8NwCnYMO2ii4yL7xQ",
 	"Likes":                  "rB9KIiRz0_xi9KmNYS4vfA",
+	"SearchTimeline":         "WOJ2CjW09lX6oI_wd2gBgA",
 	"UserTweets":             "lrMzG9qPQHpqJdP3AbM-bQ",
 	"UserTweetsAndReplies":   "3YJONShMAajim63A8iF-sw",
 	"TweetDetail":            "_i0BBmP_dK_ZLFa2Y-ei9Q",
+	"Following":              "W4wP32V0wLwNTbA3m4TnSA",
+	"Followers":              "3ywp9kIIW-VQOssauKmLiQ",
 	"HomeLatestTimeline":     "PyccKQwFZpSmD1revPllaA",
 	"Viewer":                 "_8ClT24oZ8tpylf_OSuNdg",
 }

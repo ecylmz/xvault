@@ -55,3 +55,12 @@ func TestRefreshFromPagesWritesDiscoveredIDs(t *testing.T) {
 		t.Fatalf("persisted Likes query id = %q", loaded.QueryID("Likes"))
 	}
 }
+
+func TestFallbackIncludesRequiredOperations(t *testing.T) {
+	cache := Load(filepath.Join(t.TempDir(), "missing.json"))
+	for _, op := range []string{"Bookmarks", "BookmarkFolderTimeline", "Likes", "TweetDetail", "SearchTimeline", "UserTweets", "UserTweetsAndReplies", "Following", "Followers", "HomeLatestTimeline"} {
+		if cache.QueryID(op) == "" {
+			t.Fatalf("missing fallback query id for %s", op)
+		}
+	}
+}
