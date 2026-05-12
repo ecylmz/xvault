@@ -150,6 +150,43 @@ func TestSyncPersistsAndResumesCheckpoint(t *testing.T) {
 	}
 }
 
+func TestSyncFeedStopsAfterTwoPagesOlderThanBoundary(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "xvault.sqlite")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if r.URL.Path != "/i/api/graphql/test-feed/HomeLatestTimeline" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("content-type", "application/json")
+		switch requestCount {
+		case 1:
+			_, _ = w.Write([]byte(`[{"__typename":"Tweet","rest_id":"20001","core":{"user_results":{"result":{"rest_id":"30001","core":{"screen_name":"alice","name":"Alice"}}}},"legacy":{"full_text":"old feed page one","created_at":"Mon Jan 02 15:04:05 +0000 2020","user_id_str":"30001","conversation_id_str":"20001"}},{"entryType":"TimelineTimelineCursor","cursorType":"Bottom","value":"CURSOR-1"}]`))
+		default:
+			_, _ = w.Write([]byte(`[{"__typename":"Tweet","rest_id":"20002","core":{"user_results":{"result":{"rest_id":"30001","core":{"screen_name":"alice","name":"Alice"}}}},"legacy":{"full_text":"old feed page two","created_at":"2020-01-03T15:04:05Z","user_id_str":"30001","conversation_id_str":"20002"}},{"entryType":"TimelineTimelineCursor","cursorType":"Bottom","value":"CURSOR-2"}]`))
+		}
+	}))
+	defer server.Close()
+	qids := queryids.Cache{Operations: map[string]queryids.Entry{"HomeLatestTimeline": {QueryID: "test-feed"}}}
+	x := client.New(client.Options{BaseURL: server.URL, Auth: auth.Cookies{AuthToken: "a", CT0: "c", TWID: "u=1"}})
+	result, err := New(x, st, qids, dbPath, "u=1", 0).Sync(ctx, Request{Collection: "feed", Count: 100, FeedHours: 24})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requestCount != 2 || result.PagesFetched != 2 || !result.CheckpointCleared || result.NextCursor != "" {
+		t.Fatalf("feed boundary result=%#v requests=%d", result, requestCount)
+	}
+	if count, err := st.CollectionCount(ctx, "feed"); err != nil || count != 2 {
+		t.Fatalf("feed count=%d err=%v", count, err)
+	}
+}
+
 func TestSyncRunStoresSanitizedFailureMessage(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "xvault.sqlite")

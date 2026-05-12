@@ -22,6 +22,7 @@ type Request struct {
 	All        bool
 	Full       bool
 	Folder     string
+	FeedHours  int
 }
 
 type Result struct {
@@ -105,6 +106,10 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (res Result, err error) 
 	if req.All {
 		limit = -1
 	}
+	var feedBoundary time.Time
+	if req.Collection == "feed" && !req.All && req.FeedHours > 0 {
+		feedBoundary = time.Now().UTC().Add(-time.Duration(req.FeedHours) * time.Hour)
+	}
 	for _, op := range ops {
 		cursor := ""
 		checkpointType := runCollection
@@ -121,6 +126,7 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (res Result, err error) 
 		seenCursors := map[string]bool{}
 		seenTweets := map[string]bool{}
 		unchangedPages := 0
+		oldFeedPages := 0
 		for {
 			if req.MaxPages > 0 && res.PagesFetched >= req.MaxPages {
 				return res, nil
@@ -177,6 +183,21 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (res Result, err error) 
 			res.TweetsInserted += newInPage
 			cursor = page.NextCursor
 			res.NextCursor = cursor
+			if !feedBoundary.IsZero() {
+				if pageHasTweetAtOrAfter(page, feedBoundary) {
+					oldFeedPages = 0
+				} else {
+					oldFeedPages++
+				}
+				if oldFeedPages >= 2 {
+					if err := s.store.ClearCheckpoint(ctx, checkpointType); err != nil {
+						return res, err
+					}
+					res.CheckpointCleared = true
+					res.NextCursor = ""
+					return res, nil
+				}
+			}
 			if limit > 0 && res.TweetsSeen >= limit {
 				if cursor != "" {
 					if err := s.saveCheckpoint(ctx, checkpointType, runID, cursor, res.TweetsSeen, page); err != nil {
@@ -208,6 +229,25 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (res Result, err error) 
 		}
 	}
 	return res, nil
+}
+
+func pageHasTweetAtOrAfter(page model.ParsedPage, boundary time.Time) bool {
+	for _, tw := range page.Tweets {
+		created, ok := parseTweetTime(tw.CreatedAt)
+		if ok && !created.Before(boundary) {
+			return true
+		}
+	}
+	return false
+}
+
+func parseTweetTime(value string) (time.Time, bool) {
+	for _, layout := range []string{time.RFC3339, "Mon Jan 02 15:04:05 -0700 2006"} {
+		if t, err := time.Parse(layout, value); err == nil {
+			return t.UTC(), true
+		}
+	}
+	return time.Time{}, false
 }
 
 func (s *Syncer) saveCheckpoint(ctx context.Context, collectionType, runID, cursor string, totalSeen int, page model.ParsedPage) error {

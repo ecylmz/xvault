@@ -16,7 +16,10 @@ Run bounded syncs in automation:
 ```bash
 xvault sync bookmarks --count 300 --max-pages 5 --json
 xvault sync likes --count 300 --max-pages 5 --json
+xvault sync feed --hours 24 --count 100 --max-pages 2 --json
 ```
+
+Feed sync is not part of default `xvault sync`. It is time-bounded by `--hours`, defaulting to `sync.feed_default_hours`, and stops after two consecutive pages contain no tweets newer than the boundary.
 
 Before troubleshooting sync, run:
 

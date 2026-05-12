@@ -120,6 +120,16 @@ func TestServiceExamplesIncludeBookmarksAndLikes(t *testing.T) {
 	}
 }
 
+func TestSyncFeedHelpIncludesHoursFlag(t *testing.T) {
+	code, out := executeCaptureStdout(t, []string{"sync", "feed", "--help"})
+	if code != 0 {
+		t.Fatalf("exit code = %d output=%s", code, out)
+	}
+	if !strings.Contains(out, "--hours") {
+		t.Fatalf("sync feed help missing --hours: %s", out)
+	}
+}
+
 func executeCaptureStdout(t *testing.T, args []string) (int, string) {
 	t.Helper()
 	orig := os.Stdout

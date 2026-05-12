@@ -447,7 +447,7 @@ func syncCmd(st *state) *cobra.Command {
 	var count, maxPages int
 	var all, full, withThreads bool
 	var folder, threadMode string
-	var threadLimit int
+	var threadLimit, feedHours int
 	cmd := &cobra.Command{Use: "sync [collection]", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		collections := []string{"likes", "bookmarks", "tweets", "reposts", "replies"}
 		if len(args) == 1 {
@@ -470,7 +470,7 @@ func syncCmd(st *state) *cobra.Command {
 		countChanged := cmd.Flags().Changed("count")
 		for _, col := range collections {
 			reqCount, reqAll := syncCountForCollection(st.cfg, col, count, all, countChanged)
-			res, err := sy.Sync(cmd.Context(), syncer.Request{Collection: col, Count: reqCount, MaxPages: maxPages, All: reqAll, Full: full, Folder: folder})
+			res, err := sy.Sync(cmd.Context(), syncer.Request{Collection: col, Count: reqCount, MaxPages: maxPages, All: reqAll, Full: full, Folder: folder, FeedHours: feedHours})
 			results = append(results, res)
 			if err != nil {
 				return err
@@ -507,6 +507,7 @@ func syncCmd(st *state) *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&withThreads, "with-threads", false, "expand threads after sync")
 	cmd.PersistentFlags().StringVar(&threadMode, "thread-mode", "thread", "thread expansion mode")
 	cmd.PersistentFlags().IntVar(&threadLimit, "thread-limit", 200, "thread expansion limit")
+	cmd.PersistentFlags().IntVar(&feedHours, "hours", st.cfg.Sync.FeedDefaultHours, "feed lookback hours")
 	var runsCollection, runsStatus string
 	var runsLimit int
 	runsCmd := &cobra.Command{Use: "runs", RunE: func(c *cobra.Command, args []string) error {
