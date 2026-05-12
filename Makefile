@@ -33,6 +33,18 @@ cross-build:
 		done; \
 	done
 
+.PHONY: dist
+dist:
+	rm -rf dist
+	mkdir -p dist
+	for os in linux darwin; do \
+		for arch in amd64 arm64; do \
+			name=xvault-$$os-$$arch; \
+			GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/$$name ./cmd/xvault; \
+			shasum -a 256 dist/$$name > dist/$$name.sha256; \
+		done; \
+	done
+
 .PHONY: release-check
 release-check:
 	sh tools/check_release_safety.sh

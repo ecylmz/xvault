@@ -14,6 +14,13 @@ If Docker is available locally, also verify the container image:
 make docker-check
 ```
 
+To dry-run release artifacts and checksums locally:
+
+```bash
+make dist
+ls dist/*.sha256
+```
+
 After fresh X cookies are configured, Docker is running, and the GitHub remote exists, run the strict readiness check:
 
 ```bash
@@ -37,4 +44,4 @@ git tag v0.1.0
 git push origin main v0.1.0
 ```
 
-The release workflow builds Linux and macOS binaries for amd64 and arm64.
+The release workflow builds Linux and macOS binaries for amd64 and arm64, and publishes matching `.sha256` checksum files.
