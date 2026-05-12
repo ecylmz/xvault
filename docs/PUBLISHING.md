@@ -15,6 +15,7 @@ make docker-check
 ```
 
 Set `XVAULT_DOCKER_TIMEOUT=300` if Docker Hub image pulls are slow. The check fails instead of hanging when Docker build or run steps do not finish within the timeout.
+By default, `make docker-check` uses an offline scratch-image smoke test built from the locally compiled Linux binary, so it can verify container execution without pulling base images. Run `XVAULT_DOCKER_CHECK_MODE=online make docker-check` when you specifically want to verify the checked-in multi-stage Dockerfile and Docker Hub base image pulls.
 
 To dry-run release artifacts and checksums locally:
 
