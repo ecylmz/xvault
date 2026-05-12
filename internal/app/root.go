@@ -1198,13 +1198,53 @@ func serviceCmd(st *state) *cobra.Command {
 	var user bool
 	sys.AddCommand(&cobra.Command{Use: "print", Run: func(cmd *cobra.Command, args []string) {
 		_ = user
-		fmt.Print("[Unit]\nDescription=xvault bookmark sync\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/xvault sync bookmarks --count 300 --json\n\n[Unit]\nDescription=Run xvault bookmark sync every 3 hours\n\n[Timer]\nOnBootSec=10min\nOnUnitActiveSec=3h\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n")
+		fmt.Print(`# ~/.config/systemd/user/xvault-bookmarks.service
+[Unit]
+Description=xvault bookmark sync
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/xvault sync bookmarks --count 300 --max-pages 5 --json
+
+# ~/.config/systemd/user/xvault-bookmarks.timer
+[Unit]
+Description=Run xvault bookmark sync every 3 hours
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=3h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
+# ~/.config/systemd/user/xvault-likes.service
+[Unit]
+Description=xvault likes sync
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/xvault sync likes --count 300 --max-pages 5 --json
+
+# ~/.config/systemd/user/xvault-likes.timer
+[Unit]
+Description=Run xvault likes sync every 6 hours
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+`)
 	}})
 	sys.PersistentFlags().BoolVar(&user, "user", false, "print user service example")
 	cmd.AddCommand(sys)
 	cron := &cobra.Command{Use: "cron"}
 	cron.AddCommand(&cobra.Command{Use: "print", Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("0 */3 * * * /usr/local/bin/xvault sync bookmarks --count 300 --json >> ~/.local/state/xvault/logs/bookmarks.log 2>&1")
+		fmt.Println("0 */3 * * * /usr/local/bin/xvault sync bookmarks --count 300 --max-pages 5 --json >> ~/.local/state/xvault/logs/bookmarks.log 2>&1")
+		fmt.Println("30 */6 * * * /usr/local/bin/xvault sync likes --count 300 --max-pages 5 --json >> ~/.local/state/xvault/logs/likes.log 2>&1")
 	}})
 	cmd.AddCommand(cron)
 	return cmd

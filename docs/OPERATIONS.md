@@ -9,6 +9,8 @@ xvault service systemd print --user
 xvault service cron print
 ```
 
+The generated examples include separate bookmark and likes sync jobs.
+
 Run bounded syncs in automation:
 
 ```bash
