@@ -258,6 +258,19 @@ func TestAuthStatusReportsMalformedCookieShape(t *testing.T) {
 	}
 }
 
+func TestAuthTestRejectsMalformedCookieShape(t *testing.T) {
+	t.Setenv("XVAULT_AUTH_TOKEN", "a")
+	t.Setenv("XVAULT_CT0", "c")
+	t.Setenv("XVAULT_TWID", "1")
+	code, out := executeCaptureStdout(t, []string{"--auth-source", "env", "auth", "test", "--json"})
+	if code != 4 {
+		t.Fatalf("auth test exit=%d output=%s", code, out)
+	}
+	if !strings.Contains(out, `"code":"AUTH_MALFORMED"`) || !strings.Contains(out, "[REDACTED] or [REDACTED] malformed") {
+		t.Fatalf("auth test did not report malformed auth: %s", out)
+	}
+}
+
 func TestConfigSetErrorDoesNotEchoSecretValue(t *testing.T) {
 	dir := t.TempDir()
 	code, out := executeCaptureStdout(t, []string{"--config", filepath.Join(dir, "config.toml"), "config", "set", "auth.auth_token", "SECRET_VALUE", "--json"})

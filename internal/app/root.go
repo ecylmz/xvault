@@ -519,6 +519,9 @@ func viewerAuthStatus(ctx context.Context, cfg config.Config) (auth.Source, int,
 	if err != nil {
 		return auth.Source{}, 0, err
 	}
+	if ok, msg := auth.ShapeStatus(c); !ok {
+		return src, 0, errCode("AUTH_MALFORMED", msg)
+	}
 	authCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	x := client.New(client.Options{Auth: c, MaxRetries: cfg.Sync.MaxRetries})
@@ -1573,7 +1576,7 @@ func classifyExit(err error) int {
 	if strings.Contains(err.Error(), "HTTP 401") || strings.Contains(err.Error(), "Could not authenticate") {
 		return 4
 	}
-	if coded, ok := err.(codedError); ok && coded.code == "AUTH_EXPIRED" {
+	if coded, ok := err.(codedError); ok && (coded.code == "AUTH_EXPIRED" || coded.code == "AUTH_MALFORMED") {
 		return 4
 	}
 	if strings.Contains(err.Error(), "HTTP 404") || strings.Contains(err.Error(), "Query not found") {
