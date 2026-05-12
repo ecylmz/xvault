@@ -5,6 +5,10 @@ from the matching version section in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Add the MIT license.
+
 ### Documentation
 
 - Document release binary installation with checksum verification for macOS and Linux.

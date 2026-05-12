@@ -2,10 +2,10 @@
 
 `xvault` is a local, read-only CLI tool for archiving your own X/Twitter data.
 
-It syncs likes, bookmarks, tweets, posts, replies, reposts, feed items,
-threads, and conversations into a local SQLite database. You can then search
-the archive and export it as JSON, Markdown, CSV, HTML, Hermes, or
-Obsidian-friendly files.
+It syncs likes, bookmarks, tweets, posts, replies, reposts, and feed items
+into a local SQLite database. It can also expand threads and conversations,
+then lets you search and export the archive as JSON, Markdown, CSV, HTML,
+Hermes, or Obsidian-friendly files.
 
 No paid X API key is required. `xvault` uses your own authenticated web session
 cookies and does not post, like, delete, follow, unfollow, or otherwise modify
@@ -303,4 +303,4 @@ make release VERSION=v0.1.0
 
 ## License
 
-License information has not been added yet.
+`xvault` is released under the [MIT License](LICENSE).
