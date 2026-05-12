@@ -1061,7 +1061,13 @@ func dbCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		data := map[string]any{"result": result}
+		data := map[string]any{"result": result, "ok": result == "ok"}
+		if result != "ok" {
+			if st.json {
+				writeJSONErrorWithData(os.Stdout, "db integrity", st.started, data, "DB_INTEGRITY_FAILED", "database integrity check failed", false)
+			}
+			return preformattedExitError{code: 1}
+		}
 		if st.json {
 			writeJSON(os.Stdout, "db integrity", st.started, data)
 		} else {
@@ -1169,8 +1175,15 @@ func backupCmd(st *state) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		data := map[string]any{"path": args[0], "result": result, "ok": result == "ok"}
+		if result != "ok" {
+			if st.json {
+				writeJSONErrorWithData(os.Stdout, "backup verify", st.started, data, "BACKUP_VERIFY_FAILED", "backup integrity check failed", false)
+			}
+			return preformattedExitError{code: 1}
+		}
 		if st.json {
-			writeJSON(os.Stdout, "backup verify", st.started, map[string]any{"path": args[0], "result": result})
+			writeJSON(os.Stdout, "backup verify", st.started, data)
 		} else {
 			human(os.Stdout, result)
 		}

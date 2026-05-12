@@ -85,6 +85,18 @@ func TestDoctorStrictFailsWhenChecksFail(t *testing.T) {
 	}
 }
 
+func TestBackupVerifyRejectsInvalidDatabase(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "not-sqlite.sqlite")
+	if err := os.WriteFile(path, []byte("not a sqlite database"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code := Execute([]string{"backup", "verify", path, "--json"})
+	if code == 0 {
+		t.Fatal("expected invalid backup verification to fail")
+	}
+}
+
 func TestErrorEnvelopeDoesNotLeakKnownSecretWords(t *testing.T) {
 	var buf bytes.Buffer
 	writeJSONError(&buf, "test", "AUTH_MISSING", "Authentication cookies appear to be expired.", false)
