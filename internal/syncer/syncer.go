@@ -22,6 +22,7 @@ type Request struct {
 	All        bool
 	Full       bool
 	Folder     string
+	FolderID   string
 	FeedHours  int
 }
 
@@ -150,7 +151,8 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (res Result, err error) 
 				return res, err
 			}
 			rawID, _ := s.store.SaveRaw(ctx, "graphql", op.Name, raw)
-			page, err := parser.Timeline(raw, collectionDBValue(req.Collection), "", "", rawID)
+			folderID, folderName := folderMetadata(req)
+			page, err := parser.Timeline(raw, collectionDBValue(req.Collection), folderID, folderName, rawID)
 			if err != nil {
 				return res, err
 			}
@@ -158,6 +160,7 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (res Result, err error) 
 			for i := range page.Collections {
 				page.Collections[i].SourceRunID = runID
 			}
+			res.FoldersSeen += countPageFolders(page)
 			for i := range page.Tweets {
 				if page.Tweets[i].RawJSONID == "" {
 					page.Tweets[i].RawJSONID = rawID
@@ -229,6 +232,26 @@ func (s *Syncer) Sync(ctx context.Context, req Request) (res Result, err error) 
 		}
 	}
 	return res, nil
+}
+
+func folderMetadata(req Request) (string, string) {
+	if req.Collection != "bookmarks" || req.Folder == "" {
+		return "", ""
+	}
+	if req.FolderID != "" {
+		return req.FolderID, req.Folder
+	}
+	return req.Folder, req.Folder
+}
+
+func countPageFolders(page model.ParsedPage) int {
+	seen := map[string]bool{}
+	for _, item := range page.Collections {
+		if item.CollectionType == "bookmark" && item.BookmarkFolderID != "" && !seen[item.BookmarkFolderID] {
+			seen[item.BookmarkFolderID] = true
+		}
+	}
+	return len(seen)
 }
 
 func pageHasTweetAtOrAfter(page model.ParsedPage, boundary time.Time) bool {
@@ -381,6 +404,14 @@ func (s *Syncer) operations(req Request) ([]client.Operation, error) {
 		return []client.Operation{{Name: "Likes", QueryID: s.qids.QueryID("Likes"), Variables: baseVars()}}, nil
 	case "bookmarks":
 		v := baseVars()
+		if req.Folder != "" {
+			folderID := req.FolderID
+			if folderID == "" {
+				folderID = req.Folder
+			}
+			v["folderId"] = folderID
+			return []client.Operation{{Name: "BookmarkFolderTimeline", QueryID: s.qids.QueryID("BookmarkFolderTimeline"), Variables: v}}, nil
+		}
 		// X currently exposes bookmarks through BookmarkSearchTimeline. This
 		// tautological query returns both link/media and non-link bookmarks while
 		// still satisfying the non-empty search query requirement.

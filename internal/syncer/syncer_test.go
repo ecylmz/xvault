@@ -66,6 +66,46 @@ func TestSyncLikesWithReplayServer(t *testing.T) {
 	}
 }
 
+func TestSyncBookmarkFolderUsesFolderTimelineAndMetadata(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "xvault.sqlite")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	var folderID string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/i/api/graphql/test-folder/BookmarkFolderTimeline" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		var vars map[string]any
+		if err := json.Unmarshal([]byte(r.URL.Query().Get("variables")), &vars); err != nil {
+			t.Fatal(err)
+		}
+		folderID, _ = vars["folderId"].(string)
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`[{"__typename":"Tweet","rest_id":"10001","core":{"user_results":{"result":{"rest_id":"20001","core":{"screen_name":"alice","name":"Alice"}}}},"legacy":{"full_text":"folder bookmark","created_at":"2026-01-01T00:00:00Z","user_id_str":"20001","conversation_id_str":"10001"}}]`))
+	}))
+	defer server.Close()
+	qids := queryids.Cache{Operations: map[string]queryids.Entry{"BookmarkFolderTimeline": {QueryID: "test-folder"}}}
+	x := client.New(client.Options{BaseURL: server.URL, Auth: auth.Cookies{AuthToken: "a", CT0: "c", TWID: "u=1"}})
+	result, err := New(x, st, qids, dbPath, "u=1", 0).Sync(ctx, Request{Collection: "bookmarks", Count: 10, Folder: "Research", FolderID: "folder-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if folderID != "folder-1" || result.FoldersSeen != 1 {
+		t.Fatalf("folderID=%q result=%#v", folderID, result)
+	}
+	folders, err := st.BookmarkFolders(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(folders) != 1 || folders[0].ID != "folder-1" || folders[0].Name != "Research" || folders[0].Count != 1 {
+		t.Fatalf("folders = %#v", folders)
+	}
+}
+
 func TestSyncStopsOnRepeatedCursor(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "xvault.sqlite")

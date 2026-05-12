@@ -51,6 +51,9 @@ func TestStoreUpsertSearchAndCollections(t *testing.T) {
 	if len(folders) != 1 || folders[0].Name != "Research" || folders[0].Count != 1 || folders[0].ID != "f1" {
 		t.Fatalf("bookmark folders = %#v", folders)
 	}
+	if id, ok, err := s.BookmarkFolderIDByName(ctx, "Research"); err != nil || !ok || id != "f1" {
+		t.Fatalf("folder lookup id=%q ok=%v err=%v", id, ok, err)
+	}
 	count, err := s.CollectionCount(ctx, "bookmarks")
 	if err != nil {
 		t.Fatal(err)

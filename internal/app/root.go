@@ -470,7 +470,15 @@ func syncCmd(st *state) *cobra.Command {
 		countChanged := cmd.Flags().Changed("count")
 		for _, col := range collections {
 			reqCount, reqAll := syncCountForCollection(st.cfg, col, count, all, countChanged)
-			res, err := sy.Sync(cmd.Context(), syncer.Request{Collection: col, Count: reqCount, MaxPages: maxPages, All: reqAll, Full: full, Folder: folder, FeedHours: feedHours})
+			folderID := ""
+			if col == "bookmarks" && folder != "" {
+				if id, ok, err := s.BookmarkFolderIDByName(cmd.Context(), folder); err != nil {
+					return err
+				} else if ok {
+					folderID = id
+				}
+			}
+			res, err := sy.Sync(cmd.Context(), syncer.Request{Collection: col, Count: reqCount, MaxPages: maxPages, All: reqAll, Full: full, Folder: folder, FolderID: folderID, FeedHours: feedHours})
 			results = append(results, res)
 			if err != nil {
 				return err

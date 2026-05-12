@@ -670,6 +670,28 @@ ORDER BY 2`)
 	return out, rows.Err()
 }
 
+func (s *Store) BookmarkFolderIDByName(ctx context.Context, name string) (string, bool, error) {
+	if strings.TrimSpace(name) == "" {
+		return "", false, nil
+	}
+	var id string
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM bookmark_folders WHERE name=? OR id=? ORDER BY CASE WHEN name=? THEN 0 ELSE 1 END, id LIMIT 1`, name, name, name).Scan(&id)
+	if err == nil {
+		return id, true, nil
+	}
+	if err != sql.ErrNoRows {
+		return "", false, err
+	}
+	err = s.db.QueryRowContext(ctx, `SELECT bookmark_folder_id FROM collections WHERE bookmark_folder_name=? AND bookmark_folder_id IS NOT NULL AND bookmark_folder_id <> '' ORDER BY synced_at DESC, bookmark_folder_id LIMIT 1`, name).Scan(&id)
+	if err == nil {
+		return id, true, nil
+	}
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	return "", false, err
+}
+
 func (s *Store) CollectionCount(ctx context.Context, collection string) (int64, error) {
 	var count int64
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT tweet_id) FROM collections WHERE collection_type=?`, normalizeCollection(collection)).Scan(&count)
