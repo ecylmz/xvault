@@ -48,46 +48,46 @@ Download a release binary for your OS and CPU architecture from the
 macOS Apple Silicon:
 
 ```bash
-curl -L -o xvault https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-arm64
-curl -L -o xvault.sha256 https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-arm64.sha256
-shasum -a 256 -c xvault.sha256
-chmod +x xvault
-xattr -d com.apple.quarantine xvault 2>/dev/null || true
-sudo mv xvault /usr/local/bin/xvault
+curl -LO https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-arm64
+curl -LO https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-arm64.sha256
+shasum -a 256 -c xvault-darwin-arm64.sha256
+chmod +x xvault-darwin-arm64
+xattr -d com.apple.quarantine xvault-darwin-arm64 2>/dev/null || true
+sudo mv xvault-darwin-arm64 /usr/local/bin/xvault
 xvault version --json
 ```
 
 macOS Intel:
 
 ```bash
-curl -L -o xvault https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-amd64
-curl -L -o xvault.sha256 https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-amd64.sha256
-shasum -a 256 -c xvault.sha256
-chmod +x xvault
-xattr -d com.apple.quarantine xvault 2>/dev/null || true
-sudo mv xvault /usr/local/bin/xvault
+curl -LO https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-amd64
+curl -LO https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-amd64.sha256
+shasum -a 256 -c xvault-darwin-amd64.sha256
+chmod +x xvault-darwin-amd64
+xattr -d com.apple.quarantine xvault-darwin-amd64 2>/dev/null || true
+sudo mv xvault-darwin-amd64 /usr/local/bin/xvault
 xvault version --json
 ```
 
 Linux x86_64:
 
 ```bash
-curl -L -o xvault https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-amd64
-curl -L -o xvault.sha256 https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-amd64.sha256
-sha256sum -c xvault.sha256
-chmod +x xvault
-sudo mv xvault /usr/local/bin/xvault
+curl -LO https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-amd64
+curl -LO https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-amd64.sha256
+sha256sum -c xvault-linux-amd64.sha256
+chmod +x xvault-linux-amd64
+sudo mv xvault-linux-amd64 /usr/local/bin/xvault
 xvault version --json
 ```
 
 Linux arm64:
 
 ```bash
-curl -L -o xvault https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-arm64
-curl -L -o xvault.sha256 https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-arm64.sha256
-sha256sum -c xvault.sha256
-chmod +x xvault
-sudo mv xvault /usr/local/bin/xvault
+curl -LO https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-arm64
+curl -LO https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-arm64.sha256
+sha256sum -c xvault-linux-arm64.sha256
+chmod +x xvault-linux-arm64
+sudo mv xvault-linux-arm64 /usr/local/bin/xvault
 xvault version --json
 ```
 

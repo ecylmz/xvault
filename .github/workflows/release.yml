@@ -34,7 +34,7 @@ jobs:
           date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           ldflags="-s -w -X github.com/ecylmz/xvault/internal/app.version=${version} -X github.com/ecylmz/xvault/internal/app.commit=${commit} -X github.com/ecylmz/xvault/internal/app.date=${date}"
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -trimpath -ldflags="${ldflags}" -o "dist/${name}" ./cmd/xvault
-          sha256sum "dist/${name}" > "dist/${name}.sha256"
+          (cd dist && sha256sum "${name}" > "${name}.sha256")
       - uses: actions/upload-artifact@v7
         with:
           name: xvault-${{ matrix.goos }}-${{ matrix.goarch }}

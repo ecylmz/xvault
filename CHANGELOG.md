@@ -8,6 +8,10 @@ All notable changes to xvault are documented here. Release notes are generated f
 
 - Document release binary installation with checksum verification for macOS and Linux.
 
+### Fixed
+
+- Generate release checksum files with portable basenames instead of `dist/` paths.
+
 ## [v0.1.0] - 2026-05-12
 
 ### Added

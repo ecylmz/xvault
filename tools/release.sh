@@ -42,7 +42,7 @@ sh tools/changelog_notes.sh "$version" > "$notes"
 
 make publish-check
 make dist
-shasum -a 256 -c dist/*.sha256
+(cd dist && shasum -a 256 -c *.sha256)
 
 git tag -a "$version" -m "Release $version"
 git push origin main "$version"

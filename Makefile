@@ -41,7 +41,7 @@ dist:
 		for arch in amd64 arm64; do \
 			name=xvault-$$os-$$arch; \
 			GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/$$name ./cmd/xvault; \
-			shasum -a 256 dist/$$name > dist/$$name.sha256; \
+			(cd dist && shasum -a 256 $$name > $$name.sha256); \
 		done; \
 	done
 
