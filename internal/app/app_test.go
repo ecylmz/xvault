@@ -24,9 +24,15 @@ func TestVersionJSON(t *testing.T) {
 func TestShowIncludeRawBlocked(t *testing.T) {
 	dir := t.TempDir()
 	db := filepath.Join(dir, "x.sqlite")
-	code := Execute([]string{"--db", db, "show", "123", "--include-raw", "--json"})
+	code, out := executeCaptureStdout(t, []string{"--db", db, "show", "123", "--include-raw", "--json"})
 	if code == 0 {
 		t.Fatal("expected RAW_OUTPUT_BLOCKED or not found failure")
+	}
+	if !strings.Contains(out, `"code":"RAW_OUTPUT_BLOCKED"`) {
+		t.Fatalf("expected RAW_OUTPUT_BLOCKED output: %s", out)
+	}
+	if _, err := os.Stat(db); !os.IsNotExist(err) {
+		t.Fatalf("raw block should happen before opening db, stat err=%v", err)
 	}
 }
 
