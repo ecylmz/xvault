@@ -821,6 +821,34 @@ func (s *Store) Stats(ctx context.Context) (map[string]any, error) {
 		collections[k] = v
 	}
 	out["collections"] = collections
+	out["likes"] = collections["like"]
+	out["bookmarks"] = collections["bookmark"]
+	out["own_tweets"] = collections["tweet"]
+	out["reposts"] = collections["repost"]
+	out["replies"] = collections["reply"]
+	out["feed"] = collections["feed"]
+	out["threads"] = collections["thread"]
+	out["conversations"] = collections["conversation"]
+	incompleteSyncs, err := s.incompleteSyncCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out["incomplete_syncs"] = incompleteSyncs
+	incompleteThreads, err := s.incompleteThreadCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out["incomplete_threads"] = incompleteThreads
+	lastSync, err := s.lastSyncByCollection(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	out["last_sync"] = lastSync
+	lastSuccessfulSync, err := s.lastSyncByCollection(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	out["last_successful_sync"] = lastSuccessfulSync
 	folders := map[string]int64{}
 	folderRows, err := s.db.QueryContext(ctx, `SELECT COALESCE(bookmark_folder_name,''), COUNT(DISTINCT tweet_id) FROM collections WHERE collection_type='bookmark' GROUP BY COALESCE(bookmark_folder_name,'') ORDER BY 1`)
 	if err != nil {
@@ -853,6 +881,39 @@ func (s *Store) Stats(ctx context.Context) (map[string]any, error) {
 		out["database_size_bytes"] = info.Size()
 	}
 	return out, nil
+}
+
+func (s *Store) incompleteSyncCount(ctx context.Context) (int64, error) {
+	var count int64
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sync_runs WHERE status IN ('partial','failed','running','in_progress')`).Scan(&count)
+	return count, err
+}
+
+func (s *Store) incompleteThreadCount(ctx context.Context) (int64, error) {
+	var count int64
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM threads WHERE is_complete=0`).Scan(&count)
+	return count, err
+}
+
+func (s *Store) lastSyncByCollection(ctx context.Context, successOnly bool) (map[string]string, error) {
+	where := ""
+	if successOnly {
+		where = "WHERE status='success'"
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT collection_type, MAX(COALESCE(finished_at, started_at)) FROM sync_runs `+where+` GROUP BY collection_type ORDER BY collection_type`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var collection, at string
+		if err := rows.Scan(&collection, &at); err != nil {
+			return nil, err
+		}
+		out[collection] = at
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) BookmarkFolders(ctx context.Context) ([]BookmarkFolder, error) {

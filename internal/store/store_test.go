@@ -46,6 +46,9 @@ func TestStoreUpsertSearchAndCollections(t *testing.T) {
 	if stats["database_size_bytes"] == nil || stats["raw_payload_size_bytes"] == nil {
 		t.Fatalf("stats missing size fields: %#v", stats)
 	}
+	if stats["bookmarks"] != int64(1) {
+		t.Fatalf("stats bookmarks = %#v", stats["bookmarks"])
+	}
 	folders, err := s.BookmarkFolders(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -478,5 +481,20 @@ func TestSyncRunLifecycle(t *testing.T) {
 	}
 	if len(unresolved) != 1 || unresolved[0].ID != bookmarkFailure {
 		t.Fatalf("unresolved failures = %#v", unresolved)
+	}
+	stats, err := st.Stats(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats["incomplete_syncs"] != int64(2) {
+		t.Fatalf("incomplete_syncs = %#v", stats["incomplete_syncs"])
+	}
+	lastSync, ok := stats["last_sync"].(map[string]string)
+	if !ok || lastSync["like"] == "" || lastSync["bookmark"] == "" {
+		t.Fatalf("last_sync = %#v", stats["last_sync"])
+	}
+	lastSuccess, ok := stats["last_successful_sync"].(map[string]string)
+	if !ok || lastSuccess["like"] == "" {
+		t.Fatalf("last_successful_sync = %#v", stats["last_successful_sync"])
 	}
 }
