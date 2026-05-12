@@ -33,6 +33,19 @@ func writeJSONError(w io.Writer, command, code, message string, retryable bool) 
 	_ = json.NewEncoder(w).Encode(Envelope{OK: false, Command: command, Error: &ErrorInfo{Code: code, Message: message, Retryable: retryable, SafeForAgent: true}})
 }
 
+func writeJSONErrorWithData(w io.Writer, command string, started time.Time, data any, code, message string, retryable bool) {
+	finished := time.Now().UTC()
+	_ = json.NewEncoder(w).Encode(Envelope{
+		OK:         false,
+		Command:    command,
+		StartedAt:  started.UTC().Format(time.RFC3339),
+		FinishedAt: finished.Format(time.RFC3339),
+		DurationMS: finished.Sub(started).Milliseconds(),
+		Data:       data,
+		Error:      &ErrorInfo{Code: code, Message: message, Retryable: retryable, SafeForAgent: true},
+	})
+}
+
 func human(w io.Writer, format string, args ...any) {
 	_, _ = fmt.Fprintf(w, format+"\n", args...)
 }

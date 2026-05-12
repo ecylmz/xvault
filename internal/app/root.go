@@ -83,6 +83,9 @@ func Execute(args []string) int {
 	addCommands(root, st)
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {
+		if err, ok := err.(preformattedExitError); ok {
+			return err.code
+		}
 		code := classifyExit(err)
 		if st.json {
 			writeJSONError(os.Stdout, invokedCommand(args), classifyCode(err), sanitizeErr(err), retryable(err))
@@ -150,10 +153,15 @@ func statusCmd(st *state) *cobra.Command {
 }
 
 func doctorCmd(st *state) *cobra.Command {
-	return &cobra.Command{Use: "doctor", RunE: func(cmd *cobra.Command, args []string) error {
+	var strict bool
+	cmd := &cobra.Command{Use: "doctor", RunE: func(cmd *cobra.Command, args []string) error {
 		checks := []map[string]any{}
+		failed := 0
 		add := func(name string, ok bool, msg string) {
 			checks = append(checks, map[string]any{"name": name, "ok": ok, "message": msg})
+			if !ok {
+				failed++
+			}
 		}
 		add("config_loaded", true, st.cfgPath)
 		dbPath := config.Expand(st.cfg.Database.Path)
@@ -187,16 +195,25 @@ func doctorCmd(st *state) *cobra.Command {
 		add("git_remote", remoteOK, remoteMsg)
 		dockerOK, dockerMsg := dockerDaemonStatus(cmd.Context())
 		add("docker_daemon", dockerOK, dockerMsg)
-		data := map[string]any{"checks": checks}
+		data := map[string]any{"checks": checks, "failed_count": failed}
 		if st.json {
-			writeJSON(os.Stdout, "doctor", st.started, data)
+			if strict && failed > 0 {
+				writeJSONErrorWithData(os.Stdout, "doctor", st.started, data, "DOCTOR_CHECK_FAILED", "one or more doctor checks failed", false)
+			} else {
+				writeJSON(os.Stdout, "doctor", st.started, data)
+			}
 		} else {
 			for _, c := range checks {
 				human(os.Stdout, "%v %s: %s", c["ok"], c["name"], c["message"])
 			}
 		}
+		if strict && failed > 0 {
+			return preformattedExitError{code: 1}
+		}
 		return nil
 	}}
+	cmd.Flags().BoolVar(&strict, "strict", false, "exit nonzero when any doctor check fails")
+	return cmd
 }
 
 func gitRemoteStatus(ctx context.Context) (bool, string) {
@@ -1255,6 +1272,10 @@ type codedError struct{ code, message string }
 
 func (e codedError) Error() string       { return e.message }
 func errCode(code, message string) error { return codedError{code: code, message: message} }
+
+type preformattedExitError struct{ code int }
+
+func (e preformattedExitError) Error() string { return "command already reported failure" }
 
 func defaultConfigText() string {
 	return `[auth]

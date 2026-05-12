@@ -67,6 +67,24 @@ func TestVerifyArchiveSucceedsForQueryableBookmarksAndLikes(t *testing.T) {
 	}
 }
 
+func TestDoctorDefaultDoesNotFailWhenChecksFail(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "doctor.sqlite")
+	code := Execute([]string{"--db", db, "doctor", "--json"})
+	if code != 0 {
+		t.Fatalf("expected default doctor to stay informational, exit code = %d", code)
+	}
+}
+
+func TestDoctorStrictFailsWhenChecksFail(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "doctor.sqlite")
+	code := Execute([]string{"--db", db, "doctor", "--strict", "--json"})
+	if code == 0 {
+		t.Fatal("expected strict doctor to fail")
+	}
+}
+
 func TestErrorEnvelopeDoesNotLeakKnownSecretWords(t *testing.T) {
 	var buf bytes.Buffer
 	writeJSONError(&buf, "test", "AUTH_MISSING", "Authentication cookies appear to be expired.", false)
