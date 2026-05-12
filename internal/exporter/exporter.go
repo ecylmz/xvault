@@ -203,7 +203,7 @@ func HTMLWithFolder(ctx context.Context, st *store.Store, collection, folder, ou
 		return nil, err
 	}
 	data, _ := json.Marshal(results)
-	doc := `<!doctype html><html><head><meta charset="utf-8"><title>xvault archive</title><style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;margin:0;background:#fafafa;color:#111}.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:12px 18px;display:flex;gap:12px;align-items:center}input,select{font:inherit;padding:7px 9px;border:1px solid #bbb;border-radius:6px}.wrap{max-width:980px;margin:20px auto;padding:0 14px}.tweet{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;margin:10px 0}.meta{color:#555;font-size:13px}.cols{font-size:12px;color:#555}</style></head><body><div class="bar"><strong>xvault archive</strong><input id="q" placeholder="Search archive"><select id="c"><option value="">All</option></select><span id="n"></span></div><main class="wrap" id="list"></main><script>const data=` + string(data) + `;const q=document.getElementById('q'),c=document.getElementById('c'),list=document.getElementById('list'),n=document.getElementById('n');function setup(){[...new Set(data.flatMap(r=>r.collections||[]))].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;c.appendChild(o)})}function render(){const term=q.value.toLowerCase(),col=c.value;const rows=data.filter(r=>(!term||r.text_preview.toLowerCase().includes(term)||r.author_username.toLowerCase().includes(term))&&(!col||(r.collections||[]).includes(col))).slice(0,1000);n.textContent=rows.length+' shown';list.innerHTML=rows.map(r=>'<article class=tweet><div class=meta>@'+esc(r.author_username)+' · '+esc(r.created_at)+' · <a href="'+r.url+'">open</a></div><p>'+esc(r.text_preview)+'</p><div class=cols>'+(r.collections||[]).map(esc).join(', ')+'</div></article>').join('')}function esc(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}q.oninput=render;c.onchange=render;setup();render()</script></body></html>`
+	doc := `<!doctype html><html><head><meta charset="utf-8"><title>xvault archive</title><style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;margin:0;background:#fafafa;color:#111}.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:12px 18px;display:flex;gap:12px;align-items:center}input,select{font:inherit;padding:7px 9px;border:1px solid #bbb;border-radius:6px}.wrap{max-width:980px;margin:20px auto;padding:0 14px}.tweet{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;margin:10px 0}.meta{color:#555;font-size:13px}.quote{border-left:3px solid #ccc;margin:10px 0;padding:8px 12px;color:#333;background:#fafafa}.cols{font-size:12px;color:#555}</style></head><body><div class="bar"><strong>xvault archive</strong><input id="q" placeholder="Search archive"><select id="c"><option value="">All</option></select><span id="n"></span></div><main class="wrap" id="list"></main><script>const data=` + string(data) + `;const q=document.getElementById('q'),c=document.getElementById('c'),list=document.getElementById('list'),n=document.getElementById('n');function setup(){[...new Set(data.flatMap(r=>r.collections||[]))].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;c.appendChild(o)})}function render(){const term=q.value.toLowerCase(),col=c.value;const rows=data.filter(r=>(!term||r.text_preview.toLowerCase().includes(term)||r.author_username.toLowerCase().includes(term)||(r.quoted_text_preview||'').toLowerCase().includes(term))&&(!col||(r.collections||[]).includes(col))).slice(0,1000);n.textContent=rows.length+' shown';list.innerHTML=rows.map(r=>{const quote=r.quoted_text_preview?'<div class=quote><div class=meta>@'+esc(r.quoted_author_username)+'</div>'+esc(r.quoted_text_preview)+'</div>':'';return '<article class=tweet><div class=meta>@'+esc(r.author_username)+' · '+esc(r.created_at)+' · <a href="'+r.url+'">open</a></div><p>'+esc(r.text_preview)+'</p>'+quote+'<div class=cols>'+(r.collections||[]).map(esc).join(', ')+'</div></article>'}).join('')}function esc(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}q.oninput=render;c.onchange=render;setup();render()</script></body></html>`
 	if output != "" {
 		if err := writeFile(output, []byte(doc)); err != nil {
 			return nil, err
@@ -256,8 +256,22 @@ func markdownDoc(r model.SearchResult) string {
 	if collections.Len() == 0 {
 		collections.WriteString(" []")
 	}
-	return fmt.Sprintf("---\ntweet_id: %q\nurl: %q\nauthor_username: %q\nauthor_display_name: %q\ncreated_at: %q\ncollections:%s\nbookmark_folder: %q\nhas_media: %v\nhas_links: %v\nquoted_tweet_id: %q\nconversation_id: %q\n---\n\n%s\n\n## Source\n\n%s\n",
-		r.TweetID, r.URL, r.AuthorUsername, r.AuthorDisplayName, r.CreatedAt, collections.String(), r.BookmarkFolderName, r.HasMedia, r.HasLinks, r.QuotedTweetID, r.ConversationID, r.TextPreview, r.URL)
+	var quoted strings.Builder
+	if r.QuotedTextPreview != "" {
+		quoted.WriteString("\n\n## Quoted Tweet\n\n")
+		if r.QuotedAuthorUsername != "" {
+			quoted.WriteString(">")
+			quoted.WriteString(" @")
+			quoted.WriteString(r.QuotedAuthorUsername)
+			quoted.WriteString(": ")
+		} else {
+			quoted.WriteString("> ")
+		}
+		quoted.WriteString(strings.ReplaceAll(r.QuotedTextPreview, "\n", "\n> "))
+		quoted.WriteString("\n")
+	}
+	return fmt.Sprintf("---\ntweet_id: %q\nurl: %q\nauthor_username: %q\nauthor_display_name: %q\ncreated_at: %q\ncollections:%s\nbookmark_folder: %q\nhas_media: %v\nhas_links: %v\nquoted_tweet_id: %q\nconversation_id: %q\n---\n\n%s%s\n\n## Source\n\n%s\n",
+		r.TweetID, r.URL, r.AuthorUsername, r.AuthorDisplayName, r.CreatedAt, collections.String(), r.BookmarkFolderName, r.HasMedia, r.HasLinks, r.QuotedTweetID, r.ConversationID, r.TextPreview, quoted.String(), r.URL)
 }
 
 func safeName(created, id, author string) string {

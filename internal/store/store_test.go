@@ -91,6 +91,37 @@ func TestTombstoneDoesNotOverwriteRealTweet(t *testing.T) {
 	}
 }
 
+func TestRealTweetReplacesTombstone(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	tomb := model.ParsedPage{Tweets: []model.Tweet{{ID: "10001", Text: "[Tweet unavailable]", AuthorID: "u1", IsTombstone: true, TombstoneReason: "deleted"}}}
+	real := model.ParsedPage{Users: []model.User{{ID: "u1", Username: "alice"}}, Tweets: []model.Tweet{{ID: "10001", Text: "real text", AuthorID: "u1", AuthorUsername: "alice"}}}
+	if err := s.UpsertPage(ctx, tomb); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertPage(ctx, real); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Show(ctx, "10001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["text"] != "real text" {
+		t.Fatalf("real tweet did not replace tombstone: %#v", got)
+	}
+	var tombstone int
+	if err := s.DB().QueryRowContext(ctx, `SELECT is_tombstone FROM tweets WHERE id='10001'`).Scan(&tombstone); err != nil {
+		t.Fatal(err)
+	}
+	if tombstone != 0 {
+		t.Fatalf("is_tombstone = %d", tombstone)
+	}
+}
+
 func TestShowByURLThreadAndVacuum(t *testing.T) {
 	ctx := context.Background()
 	s, err := Open(filepath.Join(t.TempDir(), "xvault.sqlite"))

@@ -324,9 +324,9 @@ func (s *Store) SearchWithFilters(ctx context.Context, query, source, author, fo
 	if hasLink {
 		where = append(where, "EXISTS(SELECT 1 FROM urls ur WHERE ur.tweet_id=t.id)")
 	}
-	sqlText := `SELECT t.id, t.text, COALESCE(u.username,''), COALESCE(u.display_name,''), COALESCE(t.created_at,''), COALESCE(t.quoted_tweet_id,''), COALESCE(t.conversation_id,''),
+	sqlText := `SELECT t.id, t.text, COALESCE(u.username,''), COALESCE(u.display_name,''), COALESCE(t.created_at,''), COALESCE(t.quoted_tweet_id,''), COALESCE(qt.text,''), COALESCE(qu.username,''), COALESCE(qu.display_name,''), COALESCE(t.conversation_id,''),
 EXISTS(SELECT 1 FROM media m WHERE m.tweet_id=t.id), EXISTS(SELECT 1 FROM urls ur WHERE ur.tweet_id=t.id)
-FROM tweets t LEFT JOIN users u ON u.id=t.author_id `
+FROM tweets t LEFT JOIN users u ON u.id=t.author_id LEFT JOIN tweets qt ON qt.id=t.quoted_tweet_id AND qt.is_tombstone=0 LEFT JOIN users qu ON qu.id=qt.author_id `
 	if joinFTS {
 		sqlText += `JOIN tweets_fts_map fm ON fm.tweet_id=t.id JOIN tweets_fts f ON f.rowid=fm.rowid `
 	}
@@ -340,11 +340,12 @@ FROM tweets t LEFT JOIN users u ON u.id=t.author_id `
 	var out []model.SearchResult
 	for rows.Next() {
 		var r model.SearchResult
-		if err := rows.Scan(&r.TweetID, &r.TextPreview, &r.AuthorUsername, &r.AuthorDisplayName, &r.CreatedAt, &r.QuotedTweetID, &r.ConversationID, &r.HasMedia, &r.HasLinks); err != nil {
+		if err := rows.Scan(&r.TweetID, &r.TextPreview, &r.AuthorUsername, &r.AuthorDisplayName, &r.CreatedAt, &r.QuotedTweetID, &r.QuotedTextPreview, &r.QuotedAuthorUsername, &r.QuotedAuthorDisplayName, &r.ConversationID, &r.HasMedia, &r.HasLinks); err != nil {
 			return nil, err
 		}
 		r.URL = CanonicalURL(r.AuthorUsername, r.TweetID)
 		r.TextPreview = preview(r.TextPreview, 260)
+		r.QuotedTextPreview = preview(r.QuotedTextPreview, 260)
 		r.Collections, r.BookmarkFolderName = s.collections(ctx, r.TweetID)
 		out = append(out, r)
 	}

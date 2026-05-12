@@ -81,18 +81,21 @@ type ParsedPage struct {
 }
 
 type SearchResult struct {
-	TweetID            string   `json:"tweet_id"`
-	URL                string   `json:"url"`
-	AuthorUsername     string   `json:"author_username"`
-	AuthorDisplayName  string   `json:"author_display_name"`
-	CreatedAt          string   `json:"created_at"`
-	Collections        []string `json:"collections"`
-	BookmarkFolderName string   `json:"bookmark_folder_name,omitempty"`
-	Score              float64  `json:"score"`
-	TextPreview        string   `json:"text_preview"`
-	HasMedia           bool     `json:"has_media"`
-	HasLinks           bool     `json:"has_links"`
-	LocalMarkdownPath  string   `json:"local_markdown_path,omitempty"`
-	QuotedTweetID      string   `json:"quoted_tweet_id,omitempty"`
-	ConversationID     string   `json:"conversation_id,omitempty"`
+	TweetID                 string   `json:"tweet_id"`
+	URL                     string   `json:"url"`
+	AuthorUsername          string   `json:"author_username"`
+	AuthorDisplayName       string   `json:"author_display_name"`
+	CreatedAt               string   `json:"created_at"`
+	Collections             []string `json:"collections"`
+	BookmarkFolderName      string   `json:"bookmark_folder_name,omitempty"`
+	Score                   float64  `json:"score"`
+	TextPreview             string   `json:"text_preview"`
+	HasMedia                bool     `json:"has_media"`
+	HasLinks                bool     `json:"has_links"`
+	LocalMarkdownPath       string   `json:"local_markdown_path,omitempty"`
+	QuotedTweetID           string   `json:"quoted_tweet_id,omitempty"`
+	QuotedTextPreview       string   `json:"quoted_text_preview,omitempty"`
+	QuotedAuthorUsername    string   `json:"quoted_author_username,omitempty"`
+	QuotedAuthorDisplayName string   `json:"quoted_author_display_name,omitempty"`
+	ConversationID          string   `json:"conversation_id,omitempty"`
 }

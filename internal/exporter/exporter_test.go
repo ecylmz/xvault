@@ -142,6 +142,52 @@ func TestExportFolderFilter(t *testing.T) {
 	}
 }
 
+func TestExportsRenderQuotedTweetContent(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	page := model.ParsedPage{
+		Users: []model.User{
+			{ID: "u1", Username: "alice", DisplayName: "Alice"},
+			{ID: "u2", Username: "bob", DisplayName: "Bob"},
+		},
+		Tweets: []model.Tweet{
+			{ID: "10001", Text: "outer quote tweet", AuthorID: "u1", AuthorUsername: "alice", QuotedTweetID: "20002", IsQuote: true, CreatedAt: "2026-01-01T00:00:00Z"},
+			{ID: "20002", Text: "quoted inner text", AuthorID: "u2", AuthorUsername: "bob", AuthorDisplayName: "Bob", CreatedAt: "2026-01-01T00:00:00Z"},
+		},
+		Collections: []model.CollectionItem{{TweetID: "10001", CollectionType: "bookmark"}},
+	}
+	if err := st.UpsertPage(ctx, page); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	mdDir := filepath.Join(dir, "markdown")
+	htmlPath := filepath.Join(dir, "archive.html")
+	if _, err := Markdown(ctx, st, "bookmarks", mdDir, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := HTML(ctx, st, "bookmarks", htmlPath); err != nil {
+		t.Fatal(err)
+	}
+	mdDoc, err := os.ReadFile(filepath.Join(mdDir, "bookmarks", "2026", "2026-01-01-10001-alice.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(mdDoc), "## Quoted Tweet") || !strings.Contains(string(mdDoc), "quoted inner text") || !strings.Contains(string(mdDoc), "@bob") {
+		t.Fatalf("markdown quoted content missing: %s", mdDoc)
+	}
+	htmlDoc, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(htmlDoc), "quoted_text_preview") || !strings.Contains(string(htmlDoc), "quoted inner text") {
+		t.Fatalf("html quoted content missing: %s", htmlDoc)
+	}
+}
+
 func TestBackupCreatesIntegrityCheckedSQLiteCopy(t *testing.T) {
 	ctx := context.Background()
 	st, err := store.Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
