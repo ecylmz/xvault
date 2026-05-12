@@ -40,8 +40,10 @@ dist:
 	for os in linux darwin; do \
 		for arch in amd64 arm64; do \
 			name=xvault-$$os-$$arch; \
-			GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/$$name ./cmd/xvault; \
-			(cd dist && shasum -a 256 $$name > $$name.sha256); \
+			mkdir -p dist/$$name; \
+			GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/$$name/xvault ./cmd/xvault; \
+			cp README.md LICENSE CHANGELOG.md dist/$$name/; \
+			(cd dist && tar -czf $$name.tar.gz $$name && shasum -a 256 $$name.tar.gz > $$name.tar.gz.sha256); \
 		done; \
 	done
 

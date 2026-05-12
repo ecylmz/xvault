@@ -1,27 +1,34 @@
 # Installation
 
-## Release Binaries
+## Homebrew
 
-Download the matching binary and checksum from the
+```bash
+brew tap ecylmz/tap
+brew install xvault
+```
+
+## Release Archives
+
+Download the matching archive and checksum from the
 [latest release](https://github.com/ecylmz/xvault/releases/latest).
 
-| Platform | Binary |
+| Platform | Archive |
 |---|---|
-| macOS Apple Silicon | `xvault-darwin-arm64` |
-| macOS Intel | `xvault-darwin-amd64` |
-| Linux x86_64 | `xvault-linux-amd64` |
-| Linux arm64 | `xvault-linux-arm64` |
+| macOS Apple Silicon | `xvault-darwin-arm64.tar.gz` |
+| macOS Intel | `xvault-darwin-amd64.tar.gz` |
+| Linux x86_64 | `xvault-linux-amd64.tar.gz` |
+| Linux arm64 | `xvault-linux-arm64.tar.gz` |
 
 macOS Apple Silicon example:
 
 ```bash
 base=https://github.com/ecylmz/xvault/releases/latest/download
-curl -LO "$base/xvault-darwin-arm64"
-curl -LO "$base/xvault-darwin-arm64.sha256"
-shasum -a 256 -c xvault-darwin-arm64.sha256
-chmod +x xvault-darwin-arm64
-xattr -d com.apple.quarantine xvault-darwin-arm64 2>/dev/null || true
-sudo mv xvault-darwin-arm64 /usr/local/bin/xvault
+curl -LO "$base/xvault-darwin-arm64.tar.gz"
+curl -LO "$base/xvault-darwin-arm64.tar.gz.sha256"
+shasum -a 256 -c xvault-darwin-arm64.tar.gz.sha256
+tar -xzf xvault-darwin-arm64.tar.gz
+xattr -d com.apple.quarantine xvault-darwin-arm64/xvault 2>/dev/null || true
+sudo mv xvault-darwin-arm64/xvault /usr/local/bin/xvault
 xvault version --json
 ```
 
@@ -29,11 +36,11 @@ Linux x86_64 example:
 
 ```bash
 base=https://github.com/ecylmz/xvault/releases/latest/download
-curl -LO "$base/xvault-linux-amd64"
-curl -LO "$base/xvault-linux-amd64.sha256"
-sha256sum -c xvault-linux-amd64.sha256
-chmod +x xvault-linux-amd64
-sudo mv xvault-linux-amd64 /usr/local/bin/xvault
+curl -LO "$base/xvault-linux-amd64.tar.gz"
+curl -LO "$base/xvault-linux-amd64.tar.gz.sha256"
+sha256sum -c xvault-linux-amd64.tar.gz.sha256
+tar -xzf xvault-linux-amd64.tar.gz
+sudo mv xvault-linux-amd64/xvault /usr/local/bin/xvault
 xvault version --json
 ```
 
