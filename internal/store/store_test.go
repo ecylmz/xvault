@@ -2,10 +2,12 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"testing"
 
 	"github.com/ecylmz/xvault/internal/model"
+	_ "modernc.org/sqlite"
 )
 
 func TestStoreUpsertSearchAndCollections(t *testing.T) {
@@ -77,6 +79,49 @@ func TestStoreUpsertSearchAndCollections(t *testing.T) {
 	results, err = s.Search(ctx, "archive", "all", "", "", 10, 0)
 	if err != nil || len(results) != 1 {
 		t.Fatalf("search after rebuild results=%d err=%v", len(results), err)
+	}
+}
+
+func TestMigrateUpgradesInitialSchema(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "old.sqlite")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldSchema := `
+CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+INSERT INTO schema_migrations(version, applied_at) VALUES(1, '2026-01-01T00:00:00Z');
+CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT, display_name TEXT, avatar_url TEXT, verified INTEGER NOT NULL DEFAULT 0, protected INTEGER NOT NULL DEFAULT 0, raw_json_id TEXT, first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL);
+CREATE TABLE tweets (id TEXT PRIMARY KEY, text TEXT NOT NULL, lang TEXT, author_id TEXT NOT NULL, created_at TEXT, conversation_id TEXT, in_reply_to_tweet_id TEXT, in_reply_to_user_id TEXT, quoted_tweet_id TEXT, retweeted_tweet_id TEXT, is_quote INTEGER NOT NULL DEFAULT 0, is_retweet INTEGER NOT NULL DEFAULT 0, is_reply INTEGER NOT NULL DEFAULT 0, is_tombstone INTEGER NOT NULL DEFAULT 0, tombstone_reason TEXT, reply_count INTEGER NOT NULL DEFAULT 0, retweet_count INTEGER NOT NULL DEFAULT 0, like_count INTEGER NOT NULL DEFAULT 0, quote_count INTEGER NOT NULL DEFAULT 0, bookmark_count INTEGER, view_count INTEGER, raw_json_id TEXT, first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL);
+CREATE TABLE collections (tweet_id TEXT NOT NULL, collection_type TEXT NOT NULL, bookmark_folder_id TEXT, bookmark_folder_id_key TEXT NOT NULL DEFAULT '', bookmark_folder_name TEXT, added_at TEXT, synced_at TEXT NOT NULL, sort_index TEXT, source_run_id TEXT, thread_id TEXT, PRIMARY KEY(tweet_id, collection_type, bookmark_folder_id_key));
+CREATE TABLE bookmark_folders (id TEXT PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER, first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL);
+CREATE TABLE media (id TEXT PRIMARY KEY, tweet_id TEXT NOT NULL, media_type TEXT NOT NULL, url TEXT, expanded_url TEXT, preview_url TEXT, local_path TEXT, width INTEGER, height INTEGER, duration_ms INTEGER, alt_text TEXT, raw_json_id TEXT);
+CREATE TABLE urls (id INTEGER PRIMARY KEY AUTOINCREMENT, tweet_id TEXT NOT NULL, url TEXT NOT NULL, expanded_url TEXT, display_url TEXT, title TEXT, description TEXT);
+`
+	if _, err := db.ExecContext(ctx, oldSchema); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for _, table := range []string{"tweets_fts", "tweets_fts_map", "threads", "thread_tweets", "raw_payloads", "sync_runs", "sync_checkpoints"} {
+		var name string
+		if err := s.DB().QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE name=?`, table).Scan(&name); err != nil {
+			t.Fatalf("missing migrated table %s: %v", table, err)
+		}
+	}
+	var versions int
+	if err := s.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations WHERE version IN (1,2,3,4)`).Scan(&versions); err != nil {
+		t.Fatal(err)
+	}
+	if versions != 4 {
+		t.Fatalf("migration versions = %d", versions)
 	}
 }
 

@@ -999,10 +999,13 @@ CREATE TABLE IF NOT EXISTS urls (id INTEGER PRIMARY KEY AUTOINCREMENT, tweet_id 
 CREATE TABLE IF NOT EXISTS raw_payloads (id TEXT PRIMARY KEY, kind TEXT NOT NULL, operation_name TEXT, sha256 TEXT NOT NULL, payload BLOB NOT NULL, compressed INTEGER NOT NULL DEFAULT 1, captured_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sync_runs (id TEXT PRIMARY KEY, collection_type TEXT NOT NULL, mode TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, pages_fetched INTEGER NOT NULL DEFAULT 0, tweets_seen INTEGER NOT NULL DEFAULT 0, tweets_inserted INTEGER NOT NULL DEFAULT 0, tweets_updated INTEGER NOT NULL DEFAULT 0, tweets_unchanged INTEGER NOT NULL DEFAULT 0, errors_count INTEGER NOT NULL DEFAULT 0, rate_limit_count INTEGER NOT NULL DEFAULT 0, error_code TEXT, error_message TEXT);
 CREATE TABLE IF NOT EXISTS sync_checkpoints (collection_type TEXT PRIMARY KEY, cursor TEXT, last_tweet_id TEXT, last_sort_index TEXT, source_run_id TEXT, total_seen INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, status TEXT NOT NULL);
+INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(4, strftime('%Y-%m-%dT%H:%M:%fZ','now'));
 CREATE TABLE IF NOT EXISTS threads (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, root_tweet_id TEXT NOT NULL, focal_tweet_id TEXT NOT NULL, focal_tweet_id_key TEXT NOT NULL, author_id TEXT NOT NULL, thread_type TEXT NOT NULL, mode TEXT NOT NULL, expansion_limit INTEGER NOT NULL, tweet_count INTEGER NOT NULL, is_complete INTEGER NOT NULL DEFAULT 0, fetched_at TEXT NOT NULL, source_run_id TEXT, UNIQUE(thread_type, focal_tweet_id_key, mode), CHECK(focal_tweet_id_key = focal_tweet_id));
 CREATE TABLE IF NOT EXISTS thread_tweets (thread_id TEXT NOT NULL, tweet_id TEXT NOT NULL, depth INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, role TEXT NOT NULL DEFAULT 'member', PRIMARY KEY(thread_id, tweet_id));
+INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(3, strftime('%Y-%m-%dT%H:%M:%fZ','now'));
 CREATE VIRTUAL TABLE IF NOT EXISTS tweets_fts USING fts5(text, author_username, author_display_name, content='', contentless_delete=1, tokenize='unicode61');
 CREATE TABLE IF NOT EXISTS tweets_fts_map (rowid INTEGER PRIMARY KEY, tweet_id TEXT NOT NULL UNIQUE, FOREIGN KEY(tweet_id) REFERENCES tweets(id));
+INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(2, strftime('%Y-%m-%dT%H:%M:%fZ','now'));
 CREATE INDEX IF NOT EXISTS idx_tweets_author ON tweets(author_id);
 CREATE INDEX IF NOT EXISTS idx_tweets_created_at ON tweets(created_at);
 CREATE INDEX IF NOT EXISTS idx_tweets_conversation ON tweets(conversation_id);
