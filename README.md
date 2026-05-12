@@ -42,6 +42,58 @@ go build -o bin/xvault ./cmd/xvault
 
 ## Install
 
+Download a release binary for your OS and CPU architecture from the
+[latest GitHub release](https://github.com/ecylmz/xvault/releases/latest).
+
+macOS Apple Silicon:
+
+```bash
+curl -L -o xvault https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-arm64
+curl -L -o xvault.sha256 https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-arm64.sha256
+shasum -a 256 -c xvault.sha256
+chmod +x xvault
+xattr -d com.apple.quarantine xvault 2>/dev/null || true
+sudo mv xvault /usr/local/bin/xvault
+xvault version --json
+```
+
+macOS Intel:
+
+```bash
+curl -L -o xvault https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-amd64
+curl -L -o xvault.sha256 https://github.com/ecylmz/xvault/releases/latest/download/xvault-darwin-amd64.sha256
+shasum -a 256 -c xvault.sha256
+chmod +x xvault
+xattr -d com.apple.quarantine xvault 2>/dev/null || true
+sudo mv xvault /usr/local/bin/xvault
+xvault version --json
+```
+
+Linux x86_64:
+
+```bash
+curl -L -o xvault https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-amd64
+curl -L -o xvault.sha256 https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-amd64.sha256
+sha256sum -c xvault.sha256
+chmod +x xvault
+sudo mv xvault /usr/local/bin/xvault
+xvault version --json
+```
+
+Linux arm64:
+
+```bash
+curl -L -o xvault https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-arm64
+curl -L -o xvault.sha256 https://github.com/ecylmz/xvault/releases/latest/download/xvault-linux-arm64.sha256
+sha256sum -c xvault.sha256
+chmod +x xvault
+sudo mv xvault /usr/local/bin/xvault
+xvault version --json
+```
+
+If `/usr/local/bin` is not writable or not on your `PATH`, install to another
+directory already on `PATH`, such as `~/.local/bin`.
+
 From a local checkout:
 
 ```bash

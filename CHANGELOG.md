@@ -2,6 +2,12 @@
 
 All notable changes to xvault are documented here. Release notes are generated from the matching version section in this file.
 
+## [Unreleased]
+
+### Documentation
+
+- Document release binary installation with checksum verification for macOS and Linux.
+
 ## [v0.1.0] - 2026-05-12
 
 ### Added
