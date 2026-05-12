@@ -925,6 +925,10 @@ func normalizeCollection(s string) string {
 		return "repost"
 	case "replies":
 		return "reply"
+	case "posts":
+		return "post"
+	case "threads":
+		return "thread"
 	default:
 		return s
 	}

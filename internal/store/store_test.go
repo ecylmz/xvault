@@ -61,6 +61,16 @@ func TestStoreUpsertSearchAndCollections(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("collection count = %d", count)
 	}
+	page.Collections = []model.CollectionItem{{TweetID: "10001", CollectionType: "post"}, {TweetID: "10001", CollectionType: "thread"}}
+	if err := s.UpsertPage(ctx, page); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := s.CollectionCount(ctx, "posts"); err != nil || count != 1 {
+		t.Fatalf("posts count = %d err=%v", count, err)
+	}
+	if results, err := s.Search(ctx, "defect", "threads", "", "", 10, 0); err != nil || len(results) != 1 {
+		t.Fatalf("threads search results=%d err=%v", len(results), err)
+	}
 	if err := s.RebuildFTS(ctx); err != nil {
 		t.Fatal(err)
 	}
