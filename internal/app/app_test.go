@@ -170,6 +170,25 @@ func TestSyncFeedHelpIncludesHoursFlag(t *testing.T) {
 	}
 }
 
+func TestExportFailsWhenOperationLockExists(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	lockFile := filepath.Join(home, ".local/state/xvault/locks/xvault.lock")
+	if err := os.MkdirAll(filepath.Dir(lockFile), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(lockFile, []byte(`{"pid":123,"started_at":"2026-01-01T00:00:00Z"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, out := executeCaptureStdout(t, []string{"export", "json", "--json"})
+	if code == 0 {
+		t.Fatalf("expected locked export to fail: %s", out)
+	}
+	if !strings.Contains(out, `"code":"LOCKED"`) || !strings.Contains(out, `"retryable":true`) {
+		t.Fatalf("expected retryable LOCKED output: %s", out)
+	}
+}
+
 func executeCaptureStdout(t *testing.T, args []string) (int, string) {
 	t.Helper()
 	orig := os.Stdout

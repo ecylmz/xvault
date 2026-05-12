@@ -191,6 +191,8 @@ func doctorCmd(st *state) *cobra.Command {
 		}
 		exportOK, exportMsg := exportDirStatus(st.cfg)
 		add("export_directory", exportOK, exportMsg)
+		lockOK, lockMsg := activeLockStatus(st.cfg)
+		add("active_lock", lockOK, lockMsg)
 		status := auth.Status(cmd.Context(), st.cfg)
 		add("auth_cookies", status["auth_token"] == "present" && status["ct0"] == "present", "auth_token="+status["auth_token"]+", ct0="+status["ct0"]+", twid="+status["twid"])
 		if online {
@@ -281,6 +283,61 @@ func exportDirStatus(cfg config.Config) (bool, string) {
 		return false, err.Error()
 	}
 	return true, path
+}
+
+func lockPath() string {
+	return config.Expand("~/.local/state/xvault/locks/xvault.lock")
+}
+
+func acquireOperationLock(cfg config.Config) (func(), error) {
+	_ = cfg
+	path := lockPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if os.IsExist(err) {
+			msg := "another xvault operation is running"
+			if b, readErr := os.ReadFile(path); readErr == nil && len(strings.TrimSpace(string(b))) > 0 {
+				msg += ": " + strings.TrimSpace(string(b))
+			}
+			return nil, errCode("LOCKED", msg)
+		}
+		return nil, err
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"pid":        os.Getpid(),
+		"started_at": time.Now().UTC().Format(time.RFC3339),
+		"path":       path,
+	})
+	if _, err := f.Write(append(payload, '\n')); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return nil, err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return nil, err
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
+
+func activeLockStatus(cfg config.Config) (bool, string) {
+	_ = cfg
+	path := lockPath()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return true, "none"
+		}
+		return false, err.Error()
+	}
+	msg := strings.TrimSpace(string(b))
+	if msg == "" {
+		msg = path
+	}
+	return false, msg
 }
 
 func queryIDFallbackStatus() (bool, string) {
@@ -543,6 +600,11 @@ func syncCmd(st *state) *cobra.Command {
 	var folder, threadMode string
 	var threadLimit, feedHours int
 	cmd := &cobra.Command{Use: "sync [collection]", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		releaseLock, err := acquireOperationLock(st.cfg)
+		if err != nil {
+			return err
+		}
+		defer releaseLock()
 		collections := []string{"likes", "bookmarks", "tweets", "reposts", "replies"}
 		if len(args) == 1 {
 			collections = []string{args[0]}
@@ -1102,6 +1164,11 @@ func exportCmd(st *state) *cobra.Command {
 	addExport := func(name string, run func(context.Context, *store.Store, string, string, string) (map[string]any, error)) {
 		var collection, folder, output string
 		c := &cobra.Command{Use: name, RunE: func(cmd *cobra.Command, args []string) error {
+			releaseLock, err := acquireOperationLock(st.cfg)
+			if err != nil {
+				return err
+			}
+			defer releaseLock()
 			s, err := store.Open(config.Expand(st.cfg.Database.Path))
 			if err != nil {
 				return err
@@ -1125,6 +1192,11 @@ func exportCmd(st *state) *cobra.Command {
 	}
 	var pretty bool
 	jsonCmd := &cobra.Command{Use: "json", RunE: func(cmd *cobra.Command, args []string) error {
+		releaseLock, err := acquireOperationLock(st.cfg)
+		if err != nil {
+			return err
+		}
+		defer releaseLock()
 		collection, _ := cmd.Flags().GetString("collection")
 		folder, _ := cmd.Flags().GetString("folder")
 		output, _ := cmd.Flags().GetString("output")
@@ -1153,6 +1225,11 @@ func exportCmd(st *state) *cobra.Command {
 	var htmlCollection, htmlFolder, htmlOutput string
 	var htmlFailOnLarge bool
 	htmlCmd := &cobra.Command{Use: "html", RunE: func(cmd *cobra.Command, args []string) error {
+		releaseLock, err := acquireOperationLock(st.cfg)
+		if err != nil {
+			return err
+		}
+		defer releaseLock()
 		s, err := store.Open(config.Expand(st.cfg.Database.Path))
 		if err != nil {
 			return err
@@ -1179,6 +1256,11 @@ func exportCmd(st *state) *cobra.Command {
 	cmd.AddCommand(htmlCmd)
 	var markdownCollection, markdownFolder, markdownOutput, markdownMode string
 	markdownCmd := &cobra.Command{Use: "markdown", RunE: func(cmd *cobra.Command, args []string) error {
+		releaseLock, err := acquireOperationLock(st.cfg)
+		if err != nil {
+			return err
+		}
+		defer releaseLock()
 		s, err := store.Open(config.Expand(st.cfg.Database.Path))
 		if err != nil {
 			return err
@@ -1217,6 +1299,11 @@ func exportCmd(st *state) *cobra.Command {
 	var obsidianCollection, obsidianFolder, obsidianOutput string
 	var obsidianWithIndex bool
 	obsidianCmd := &cobra.Command{Use: "obsidian", RunE: func(cmd *cobra.Command, args []string) error {
+		releaseLock, err := acquireOperationLock(st.cfg)
+		if err != nil {
+			return err
+		}
+		defer releaseLock()
 		s, err := store.Open(config.Expand(st.cfg.Database.Path))
 		if err != nil {
 			return err
@@ -1513,7 +1600,12 @@ func classifyCode(err error) string {
 	return "ERROR"
 }
 
-func retryable(err error) bool { return strings.Contains(err.Error(), "rate limited") }
+func retryable(err error) bool {
+	if coded, ok := err.(codedError); ok && coded.code == "LOCKED" {
+		return true
+	}
+	return strings.Contains(err.Error(), "rate limited")
+}
 
 func sanitizeErr(err error) string {
 	msg := err.Error()
