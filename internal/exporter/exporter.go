@@ -169,7 +169,7 @@ func ObsidianWithFolder(ctx context.Context, st *store.Store, collection, folder
 			index.WriteByte('\n')
 		}
 	}
-	for _, dirName := range sortedKeys(collectionNotes) {
+	for _, dirName := range obsidianCollectionOrder() {
 		if err := writeObsidianCollectionIndex(output, dirName, collectionNotes[dirName]); err != nil {
 			return nil, err
 		}
@@ -310,9 +310,17 @@ func obsidianCollectionDir(cols []string, fallback string) string {
 	}
 }
 
+func obsidianCollectionOrder() []string {
+	return []string{"Bookmarks", "Likes", "Tweets", "Reposts", "Replies", "Feed"}
+}
+
 func writeObsidianCollectionIndex(output, dirName string, rows []model.SearchResult) error {
 	var b strings.Builder
 	b.WriteString("# " + dirName + "\n\n")
+	if len(rows) == 0 {
+		b.WriteString("No records exported.\n")
+		return os.WriteFile(filepath.Join(output, dirName+".md"), []byte(b.String()), 0o644)
+	}
 	b.WriteString(fmt.Sprintf("%d records exported.\n\n", len(rows)))
 	for _, r := range rows {
 		rel := filepath.ToSlash(filepath.Join(dirName, exportYear(r.CreatedAt), safeName(r.CreatedAt, r.TweetID, r.AuthorUsername)+".md"))

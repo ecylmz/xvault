@@ -83,6 +83,16 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	if !strings.Contains(string(indexDoc), filepath.ToSlash("bookmarks/2026/2026-01-01-10001-alice.md")) {
 		t.Fatalf("index path is not stable year layout: %s", indexDoc)
 	}
+	emptyIndex, err := os.ReadFile(filepath.Join(obsidianDir, "Likes.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(emptyIndex), "No records exported.") {
+		t.Fatalf("empty obsidian collection index = %s", emptyIndex)
+	}
+	if _, err := os.Stat(filepath.Join(obsidianDir, "Likes")); !os.IsNotExist(err) {
+		t.Fatalf("empty obsidian collection directory should not exist, err=%v", err)
+	}
 }
 
 func TestMarkdownPathUsesTwitterDateYearLayout(t *testing.T) {
