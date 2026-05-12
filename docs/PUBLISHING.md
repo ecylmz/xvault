@@ -3,19 +3,10 @@
 Run the local release gates before creating a GitHub repository or tag:
 
 ```bash
-go test ./...
-golangci-lint run
-go build -o bin/xvault ./cmd/xvault
-make release-check
-make verify-archive
-for os in linux darwin; do
-  for arch in amd64 arm64; do
-    GOOS=$os GOARCH=$arch go build -o /tmp/xvault-$os-$arch ./cmd/xvault
-  done
-done
+make publish-check
 ```
 
-`make verify-archive` is intentionally a local publishing gate, not a CI gate. It uses the configured SQLite database and fails unless the archive has synced bookmarks and likes that are queryable through normal collection search and FTS.
+`make publish-check` runs the CI-safe checks, lint, local build, Linux/macOS amd64/arm64 cross-builds, and `make verify-archive`. `make verify-archive` is intentionally a local publishing gate, not a GitHub Actions gate. It uses the configured SQLite database and fails unless the archive has synced bookmarks and likes that are queryable through normal collection search and FTS.
 
 If Docker is available locally, also verify the container image:
 
