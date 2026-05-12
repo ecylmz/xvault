@@ -14,6 +14,14 @@ If Docker is available locally, also verify the container image:
 make docker-check
 ```
 
+After fresh X cookies are configured, Docker is running, and the GitHub remote exists, run the strict readiness check:
+
+```bash
+xvault doctor --online --strict --json
+```
+
+This check fails if live X auth is rejected, local database integrity is broken, unresolved sync failures remain, `origin` is missing, or Docker is unavailable.
+
 Create the GitHub repository only when you are ready for the project to become visible:
 
 ```bash
