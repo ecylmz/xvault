@@ -181,8 +181,8 @@ func doctorCmd(st *state) *cobra.Command {
 			} else {
 				add("database_integrity", result == "ok", result)
 			}
-			if runs, err := s.ListSyncRuns(cmd.Context(), "all", "failed", 3); err == nil {
-				add("recent_sync_failures", len(runs) == 0, fmt.Sprintf("%d failed run(s)", len(runs)))
+			if runs, err := s.UnresolvedFailedSyncRuns(cmd.Context(), 3); err == nil {
+				add("unresolved_sync_failures", len(runs) == 0, fmt.Sprintf("%d unresolved failed run(s)", len(runs)))
 			}
 		}
 		status := auth.Status(cmd.Context(), st.cfg)

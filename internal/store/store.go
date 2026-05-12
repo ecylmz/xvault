@@ -827,6 +827,37 @@ FROM sync_runs WHERE `+strings.Join(where, " AND ")+` ORDER BY started_at DESC, 
 	return out, rows.Err()
 }
 
+func (s *Store) UnresolvedFailedSyncRuns(ctx context.Context, limit int) ([]SyncRun, error) {
+	if limit <= 0 {
+		limit = 20
+	} else if limit > 500 {
+		limit = 500
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT f.id, f.collection_type, f.mode, f.status, f.pages_fetched, f.tweets_seen, f.tweets_inserted, f.tweets_updated, f.tweets_unchanged, f.errors_count, f.rate_limit_count, COALESCE(f.error_code,''), COALESCE(f.error_message,''), f.started_at, COALESCE(f.finished_at,'')
+FROM sync_runs f
+WHERE f.status='failed'
+  AND NOT EXISTS (
+    SELECT 1 FROM sync_runs s
+    WHERE s.collection_type=f.collection_type
+      AND s.status='success'
+      AND COALESCE(s.finished_at, s.started_at) >= COALESCE(f.finished_at, f.started_at)
+  )
+ORDER BY f.started_at DESC, f.id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SyncRun
+	for rows.Next() {
+		var run SyncRun
+		if err := rows.Scan(&run.ID, &run.CollectionType, &run.Mode, &run.Status, &run.PagesFetched, &run.TweetsSeen, &run.TweetsInserted, &run.TweetsUpdated, &run.TweetsUnchanged, &run.ErrorsCount, &run.RateLimitCount, &run.ErrorCode, &run.ErrorMessage, &run.StartedAt, &run.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, run)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) SanitizeSyncRunErrors(ctx context.Context) (int64, error) {
 	res, err := s.db.ExecContext(ctx, `UPDATE sync_runs
 SET error_message = CASE error_code

@@ -304,4 +304,25 @@ func TestSyncRunLifecycle(t *testing.T) {
 	if !ok || success.ID != successID || success.Status != "success" {
 		t.Fatalf("last success = %#v ok=%v", success, ok)
 	}
+	unresolved, err := st.UnresolvedFailedSyncRuns(ctx, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unresolved) != 0 {
+		t.Fatalf("expected later success to resolve failed run, got %#v", unresolved)
+	}
+	bookmarkFailure, err := st.StartSyncRun(ctx, "bookmark", "incremental")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.FinishSyncRun(ctx, SyncRun{ID: bookmarkFailure, Status: "failed", ErrorCode: "AUTH_EXPIRED"}); err != nil {
+		t.Fatal(err)
+	}
+	unresolved, err = st.UnresolvedFailedSyncRuns(ctx, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unresolved) != 1 || unresolved[0].ID != bookmarkFailure {
+		t.Fatalf("unresolved failures = %#v", unresolved)
+	}
 }

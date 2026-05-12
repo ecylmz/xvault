@@ -41,6 +41,8 @@ Use online mode when the diagnostic should also validate the active X session wi
 xvault doctor --online --strict --json
 ```
 
+`doctor` treats failed sync runs as unresolved only until a later successful run exists for the same collection.
+
 `sync runs` reports recent success, partial, and failed sync attempts with run IDs, counters, error codes, and timestamps. Filter it with `--collection bookmarks`, `--collection likes`, or `--status failed` when diagnosing automation.
 
 `sync checkpoints` reports any retained resumable cursors after a bounded, interrupted, partial, or rate-limited sync.
