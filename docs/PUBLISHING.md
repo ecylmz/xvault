@@ -14,6 +14,8 @@ If Docker is available locally, also verify the container image:
 make docker-check
 ```
 
+Set `XVAULT_DOCKER_TIMEOUT=300` if Docker Hub image pulls are slow. The check fails instead of hanging when Docker build or run steps do not finish within the timeout.
+
 To dry-run release artifacts and checksums locally:
 
 ```bash
