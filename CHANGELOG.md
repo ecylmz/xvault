@@ -5,9 +5,13 @@ from the matching version section in this file.
 
 ## [Unreleased]
 
+## [v0.1.1] - 2026-05-13
+
 ### Added
 
 - Add the MIT license.
+- Support authenticated user timeline sync for own tweets and reposts with the
+  documented `sync tweets --count N` and `sync reposts --all` commands.
 
 ### Documentation
 
@@ -20,6 +24,9 @@ from the matching version section in this file.
 
 - Generate release checksum files with portable basenames instead of `dist/`
   paths.
+- Store repost collection entries with the original reposted tweet content,
+  author metadata, engagement metrics, and entities while preserving the repost
+  record linkage.
 
 ## [v0.1.0] - 2026-05-12
 

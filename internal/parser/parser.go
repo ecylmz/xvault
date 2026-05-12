@@ -55,7 +55,7 @@ func parseTweet(m map[string]any, rawID string) (model.Tweet, []model.URL, []mod
 	if !idRe.MatchString(id) {
 		return model.Tweet{}, nil, nil, nil, nil, false
 	}
-	text := first(str(legacy, "full_text", "text"), str(m, "full_text", "text"))
+	text := first(noteTweetText(m), str(legacy, "full_text", "text"), str(m, "full_text", "text"))
 	if text == "" && !looksTweet(m) {
 		return model.Tweet{}, nil, nil, nil, nil, false
 	}
@@ -75,6 +75,8 @@ func parseTweet(m map[string]any, rawID string) (model.Tweet, []model.URL, []mod
 		ReplyCount: intv(legacy, "reply_count"), RetweetCount: intv(legacy, "retweet_count"),
 		LikeCount: intv(legacy, "favorite_count"), QuoteCount: intv(legacy, "quote_count"),
 	}
+	entityLegacy := legacy
+	quoteSource := m
 	if tw.ConversationID == "" {
 		tw.ConversationID = id
 	}
@@ -89,16 +91,38 @@ func parseTweet(m map[string]any, rawID string) (model.Tweet, []model.URL, []mod
 			tw.AuthorDisplayName = first(str(coreUser, "name"), str(legacyUser, "name"))
 		}
 	}
-	if quoted := obj(m, "quoted_status_result"); quoted != nil {
-		if result := obj(quoted, "result"); result != nil {
-			tw.QuotedTweetID = str(result, "rest_id")
-			tw.IsQuote = tw.QuotedTweetID != ""
-		}
-	}
 	if retweeted := obj(legacy, "retweeted_status_result"); retweeted != nil {
 		if result := obj(retweeted, "result"); result != nil {
 			tw.RetweetedTweetID = str(result, "rest_id")
 			tw.IsRetweet = tw.RetweetedTweetID != ""
+			rtLegacy := obj(result, "legacy")
+			if rtText := first(noteTweetText(result), str(rtLegacy, "full_text", "text")); rtText != "" {
+				tw.Text = htmlUnescape(rtText)
+			}
+			entityLegacy = rtLegacy
+			quoteSource = result
+			tw.Lang = str(rtLegacy, "lang")
+			tw.ReplyCount = intv(rtLegacy, "reply_count")
+			tw.RetweetCount = intv(rtLegacy, "retweet_count")
+			tw.LikeCount = intv(rtLegacy, "favorite_count")
+			tw.QuoteCount = intv(rtLegacy, "quote_count")
+			if resultAuthorID := str(obj(obj(obj(result, "core"), "user_results"), "result"), "rest_id", "id"); resultAuthorID != "" {
+				tw.AuthorID = resultAuthorID
+			}
+			if core := obj(result, "core"); core != nil {
+				if userResult := obj(obj(core, "user_results"), "result"); userResult != nil {
+					legacyUser := obj(userResult, "legacy")
+					coreUser := obj(userResult, "core")
+					tw.AuthorUsername = first(str(coreUser, "screen_name"), str(legacyUser, "screen_name"), tw.AuthorUsername)
+					tw.AuthorDisplayName = first(str(coreUser, "name"), str(legacyUser, "name"), tw.AuthorDisplayName)
+				}
+			}
+		}
+	}
+	if quoted := obj(quoteSource, "quoted_status_result"); quoted != nil {
+		if result := obj(quoted, "result"); result != nil {
+			tw.QuotedTweetID = str(result, "rest_id")
+			tw.IsQuote = tw.QuotedTweetID != ""
 		}
 	}
 	if views := obj(m, "views"); views != nil {
@@ -112,7 +136,7 @@ func parseTweet(m map[string]any, rawID string) (model.Tweet, []model.URL, []mod
 	var media []model.Media
 	var mentions []model.Mention
 	var hashtags []model.Hashtag
-	entities := obj(legacy, "entities")
+	entities := obj(entityLegacy, "entities")
 	for _, u := range arrKey(entities, "urls") {
 		if um, ok := u.(map[string]any); ok {
 			urls = append(urls, model.URL{TweetID: id, URL: str(um, "url"), ExpandedURL: str(um, "expanded_url"), DisplayURL: str(um, "display_url")})
@@ -136,7 +160,7 @@ func parseTweet(m map[string]any, rawID string) (model.Tweet, []model.URL, []mod
 			hashtags = append(hashtags, model.Hashtag{TweetID: id, Tag: tag})
 		}
 	}
-	for _, mm := range append(arrKey(entities, "media"), arrKey(obj(legacy, "extended_entities"), "media")...) {
+	for _, mm := range append(arrKey(entities, "media"), arrKey(obj(entityLegacy, "extended_entities"), "media")...) {
 		if med, ok := mm.(map[string]any); ok {
 			media = append(media, model.Media{ID: str(med, "id_str", "media_key"), TweetID: id, MediaType: str(med, "type"), URL: str(med, "media_url_https", "media_url"), ExpandedURL: str(med, "expanded_url"), PreviewURL: str(med, "media_url_https", "media_url"), AltText: str(med, "ext_alt_text")})
 		}
@@ -243,6 +267,11 @@ func first(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func noteTweetText(m map[string]any) string {
+	result := obj(obj(obj(m, "note_tweet"), "note_tweet_results"), "result")
+	return str(result, "text")
 }
 
 func looksTweet(m map[string]any) bool {

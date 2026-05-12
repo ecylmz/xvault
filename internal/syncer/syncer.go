@@ -322,27 +322,32 @@ func classifySyncError(err error) string {
 
 func normalizePageForCollection(page model.ParsedPage, collection string) model.ParsedPage {
 	keep := map[string]bool{}
+	referenced := map[string]bool{}
+	for _, tw := range page.Tweets {
+		if tw.QuotedTweetID != "" {
+			referenced[tw.QuotedTweetID] = true
+		}
+		if tw.RetweetedTweetID != "" {
+			referenced[tw.RetweetedTweetID] = true
+		}
+	}
 	filtered := page.Tweets[:0]
 	for _, tw := range page.Tweets {
 		include := true
 		switch collection {
 		case "tweets":
-			include = !tw.IsRetweet && !tw.IsReply
+			include = !tw.IsRetweet && !tw.IsReply && !referenced[tw.ID]
 		case "replies":
-			include = tw.IsReply
+			include = tw.IsReply && !referenced[tw.ID]
 		case "reposts":
 			include = tw.IsRetweet || tw.RetweetedTweetID != ""
+		case "posts":
+			include = !tw.IsReply && !referenced[tw.ID]
 		}
 		if include {
 			filtered = append(filtered, tw)
 			keep[tw.ID] = true
 		}
-	}
-	if collection == "posts" {
-		for _, tw := range page.Tweets {
-			keep[tw.ID] = true
-		}
-		filtered = page.Tweets
 	}
 	page.Tweets = filtered
 	collections := []model.CollectionItem{}
@@ -440,16 +445,30 @@ func (s *Syncer) operations(req Request) ([]client.Operation, error) {
 		v["rawQuery"] = "filter:links OR filter:media OR -filter:links"
 		return []client.Operation{{Name: "BookmarkSearchTimeline", QueryID: s.qids.QueryID("BookmarkSearchTimeline"), Variables: v}}, nil
 	case "tweets":
-		return []client.Operation{{Name: "UserTweets", QueryID: s.qids.QueryID("UserTweets"), Variables: baseVars()}}, nil
+		v, err := s.userTimelineVars(count)
+		if err != nil {
+			return nil, err
+		}
+		return []client.Operation{{Name: "UserTweets", QueryID: s.qids.QueryID("UserTweets"), Variables: v, FieldToggles: userTimelineFieldToggles()}}, nil
 	case "replies":
-		v := baseVars()
-		v["includePromotedContent"] = true
+		v, err := s.userTimelineVars(count)
+		if err != nil {
+			return nil, err
+		}
 		v["withCommunity"] = false
-		return []client.Operation{{Name: "UserTweetsAndReplies", QueryID: s.qids.QueryID("UserTweetsAndReplies"), Method: "POST", Variables: v, FieldToggles: defaultFieldToggles()}}, nil
+		return []client.Operation{{Name: "UserTweetsAndReplies", QueryID: s.qids.QueryID("UserTweetsAndReplies"), Method: "POST", Variables: v, FieldToggles: userTimelineFieldToggles()}}, nil
 	case "posts":
-		return []client.Operation{{Name: "UserTweets", QueryID: s.qids.QueryID("UserTweets"), Variables: baseVars()}}, nil
+		v, err := s.userTimelineVars(count)
+		if err != nil {
+			return nil, err
+		}
+		return []client.Operation{{Name: "UserTweets", QueryID: s.qids.QueryID("UserTweets"), Variables: v, FieldToggles: userTimelineFieldToggles()}}, nil
 	case "reposts":
-		return []client.Operation{{Name: "UserTweets", QueryID: s.qids.QueryID("UserTweets"), Variables: baseVars()}}, nil
+		v, err := s.userTimelineVars(count)
+		if err != nil {
+			return nil, err
+		}
+		return []client.Operation{{Name: "UserTweets", QueryID: s.qids.QueryID("UserTweets"), Variables: v, FieldToggles: userTimelineFieldToggles()}}, nil
 	case "feed":
 		return []client.Operation{{Name: "HomeLatestTimeline", QueryID: s.qids.QueryID("HomeLatestTimeline"), Variables: map[string]any{"count": count, "includePromotedContent": false, "latestControlAvailable": true}}}, nil
 	default:
@@ -457,14 +476,26 @@ func (s *Syncer) operations(req Request) ([]client.Operation, error) {
 	}
 }
 
-func defaultFieldToggles() map[string]any {
+func (s *Syncer) userTimelineVars(count int) (map[string]any, error) {
+	if s.userID == "" {
+		return nil, fmt.Errorf("twid cookie is required for authenticated user timeline sync")
+	}
 	return map[string]any{
-		"withPayments":                false,
-		"withAuxiliaryUserLabels":     false,
-		"withArticleRichContentState": false,
+		"userId":                                 s.userID,
+		"count":                                  count,
+		"includePromotedContent":                 true,
+		"withQuickPromoteEligibilityTweetFields": true,
+		"withVoice":                              true,
+		"withV2Timeline":                         true,
+	}, nil
+}
+
+func userTimelineFieldToggles() map[string]any {
+	return map[string]any{
 		"withArticlePlainText":        false,
-		"withArticleSummaryText":      false,
-		"withArticleVoiceOver":        false,
+		"withArticleRichContentState": true,
+		"withAuxiliaryUserLabels":     false,
+		"withPayments":                false,
 		"withGrokAnalyze":             false,
 		"withDisallowedReplyControls": false,
 	}

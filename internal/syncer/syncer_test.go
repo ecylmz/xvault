@@ -67,6 +67,94 @@ func TestSyncLikesWithReplayServer(t *testing.T) {
 	}
 }
 
+func TestSyncTweetsUsesAuthenticatedUserTimelineAndFiltersOwnTweets(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "xvault.sqlite")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = st.Close() }()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/i/api/graphql/test-user/UserTweets" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		var vars map[string]any
+		if err := json.Unmarshal([]byte(r.URL.Query().Get("variables")), &vars); err != nil {
+			t.Fatal(err)
+		}
+		if vars["userId"] != "789" || vars["withV2Timeline"] != true || vars["includePromotedContent"] != true {
+			t.Fatalf("variables = %#v", vars)
+		}
+		var toggles map[string]any
+		if err := json.Unmarshal([]byte(r.URL.Query().Get("fieldToggles")), &toggles); err != nil {
+			t.Fatal(err)
+		}
+		if toggles["withArticleRichContentState"] != true {
+			t.Fatalf("field toggles = %#v", toggles)
+		}
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`[{"__typename":"Tweet","rest_id":"10001","core":{"user_results":{"result":{"rest_id":"789","core":{"screen_name":"me","name":"Me"}}}},"legacy":{"full_text":"own tweet","created_at":"2026-01-01T00:00:00Z","user_id_str":"789","conversation_id_str":"10001"}},{"__typename":"Tweet","rest_id":"10002","core":{"user_results":{"result":{"rest_id":"789","core":{"screen_name":"me","name":"Me"}}}},"legacy":{"full_text":"reply tweet","created_at":"2026-01-01T00:01:00Z","user_id_str":"789","conversation_id_str":"10001","in_reply_to_status_id_str":"10001"}},{"__typename":"Tweet","rest_id":"10003","core":{"user_results":{"result":{"rest_id":"789","core":{"screen_name":"me","name":"Me"}}}},"legacy":{"full_text":"RT @alice: reposted","created_at":"2026-01-01T00:02:00Z","user_id_str":"789","conversation_id_str":"10003","retweeted_status_result":{"result":{"rest_id":"20001","core":{"user_results":{"result":{"rest_id":"30001","core":{"screen_name":"alice","name":"Alice"}}}},"legacy":{"full_text":"reposted original","user_id_str":"30001","conversation_id_str":"20001"}}}}}]`))
+	}))
+	defer server.Close()
+	qids := queryids.Cache{Operations: map[string]queryids.Entry{"UserTweets": {QueryID: "test-user"}}}
+	x := client.New(client.Options{BaseURL: server.URL, Auth: auth.Cookies{AuthToken: "a", CT0: "c", TWID: "u=789"}})
+	result, err := New(x, st, qids, dbPath, "u%3D789", 0).Sync(ctx, Request{Collection: "tweets", Count: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PagesFetched != 1 || result.TweetsSeen != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	if count, err := st.CollectionCount(ctx, "tweets"); err != nil || count != 1 {
+		t.Fatalf("tweets count=%d err=%v", count, err)
+	}
+	if count, err := st.CollectionCount(ctx, "reposts"); err != nil || count != 0 {
+		t.Fatalf("reposts count=%d err=%v", count, err)
+	}
+}
+
+func TestSyncRepostsStoresOriginalContentInRepostCollection(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "xvault.sqlite")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = st.Close() }()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/i/api/graphql/test-user/UserTweets" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`[{"__typename":"Tweet","rest_id":"10001","core":{"user_results":{"result":{"rest_id":"789","core":{"screen_name":"me","name":"Me"}}}},"legacy":{"full_text":"own tweet","created_at":"2026-01-01T00:00:00Z","user_id_str":"789","conversation_id_str":"10001"}},{"__typename":"Tweet","rest_id":"10002","core":{"user_results":{"result":{"rest_id":"789","core":{"screen_name":"me","name":"Me"}}}},"legacy":{"full_text":"RT @alice: searchable original","created_at":"2026-01-01T00:02:00Z","user_id_str":"789","conversation_id_str":"10002","retweeted_status_result":{"result":{"rest_id":"20001","core":{"user_results":{"result":{"rest_id":"30001","core":{"screen_name":"alice","name":"Alice"}}}},"legacy":{"full_text":"searchable original","user_id_str":"30001","conversation_id_str":"20001","favorite_count":7,"entities":{"urls":[{"url":"https://t.co/o","expanded_url":"https://example.com/original","display_url":"example.com/original"}]}}}}}}]`))
+	}))
+	defer server.Close()
+	qids := queryids.Cache{Operations: map[string]queryids.Entry{"UserTweets": {QueryID: "test-user"}}}
+	x := client.New(client.Options{BaseURL: server.URL, Auth: auth.Cookies{AuthToken: "a", CT0: "c", TWID: "u=789"}})
+	result, err := New(x, st, qids, dbPath, "u=789", 0).Sync(ctx, Request{Collection: "reposts", Count: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PagesFetched != 1 || result.TweetsSeen != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	rows, err := st.Search(ctx, "searchable", "reposts", "", "", 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].TweetID != "10002" || rows[0].AuthorUsername != "alice" || rows[0].LikeCount != 7 {
+		t.Fatalf("search rows = %#v", rows)
+	}
+	var reposted string
+	if err := st.DB().QueryRowContext(ctx, `SELECT COALESCE(retweeted_tweet_id,'') FROM tweets WHERE id='10002'`).Scan(&reposted); err != nil {
+		t.Fatal(err)
+	}
+	if reposted != "20001" {
+		t.Fatalf("retweeted_tweet_id = %q", reposted)
+	}
+}
+
 func TestSyncBookmarkFolderUsesFolderTimelineAndMetadata(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "xvault.sqlite")
