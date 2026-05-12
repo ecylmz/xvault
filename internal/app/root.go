@@ -181,10 +181,16 @@ func doctorCmd(st *state) *cobra.Command {
 			} else {
 				add("database_integrity", result == "ok", result)
 			}
+			migrationsOK, migrationsMsg := migrationStatus(cmd.Context(), s)
+			add("migrations_applied", migrationsOK, migrationsMsg)
+			walOK, walMsg := walStatus(cmd.Context(), s, st.cfg.Database.WAL)
+			add("wal_mode", walOK, walMsg)
 			if runs, err := s.UnresolvedFailedSyncRuns(cmd.Context(), 3); err == nil {
 				add("unresolved_sync_failures", len(runs) == 0, fmt.Sprintf("%d unresolved failed run(s)", len(runs)))
 			}
 		}
+		exportOK, exportMsg := exportDirStatus(st.cfg)
+		add("export_directory", exportOK, exportMsg)
 		status := auth.Status(cmd.Context(), st.cfg)
 		add("auth_cookies", status["auth_token"] == "present" && status["ct0"] == "present", "auth_token="+status["auth_token"]+", ct0="+status["ct0"]+", twid="+status["twid"])
 		if online {
@@ -232,6 +238,49 @@ func doctorAuthOnlineStatus(ctx context.Context, cfg config.Config) (bool, strin
 		return false, classifyCode(err)
 	}
 	return status >= 200 && status < 300, fmt.Sprintf("source=%s http=%d", src.Name, status)
+}
+
+func migrationStatus(ctx context.Context, s *store.Store) (bool, string) {
+	var count, maxVersion int
+	err := s.DB().QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(MAX(version),0) FROM schema_migrations`).Scan(&count, &maxVersion)
+	if err != nil {
+		return false, err.Error()
+	}
+	if count < 5 || maxVersion < 5 {
+		return false, fmt.Sprintf("versions=%d max=%d, expected >=5", count, maxVersion)
+	}
+	return true, fmt.Sprintf("versions=%d max=%d", count, maxVersion)
+}
+
+func walStatus(ctx context.Context, s *store.Store, expected bool) (bool, string) {
+	var mode string
+	if err := s.DB().QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&mode); err != nil {
+		return false, err.Error()
+	}
+	if expected && !strings.EqualFold(mode, "wal") {
+		return false, mode
+	}
+	return true, mode
+}
+
+func exportDirStatus(cfg config.Config) (bool, string) {
+	path := config.Expand(cfg.Export.Dir)
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		return false, err.Error()
+	}
+	probe, err := os.CreateTemp(path, ".xvault-write-test-*")
+	if err != nil {
+		return false, err.Error()
+	}
+	name := probe.Name()
+	if err := probe.Close(); err != nil {
+		_ = os.Remove(name)
+		return false, err.Error()
+	}
+	if err := os.Remove(name); err != nil {
+		return false, err.Error()
+	}
+	return true, path
 }
 
 func queryIDFallbackStatus() (bool, string) {
