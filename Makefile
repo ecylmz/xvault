@@ -14,8 +14,12 @@ lint:
 fmt:
 	gofmt -w .
 
+.PHONY: fmt-check
+fmt-check:
+	@test -z "$$(gofmt -l .)" || (gofmt -l . && exit 1)
+
 .PHONY: ci
-ci: fmt test release-check
+ci: fmt-check test release-check
 
 .PHONY: build
 build:
