@@ -6,6 +6,10 @@
 *.db
 *.db-*
 .env
+.env.*
+*.env
+*.env.*
+!.env.example
 .DS_Store
 coverage.out
 *.test

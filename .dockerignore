@@ -2,7 +2,9 @@
 .github
 .DS_Store
 .env
+.env.*
 *.env
+*.env.*
 bin/
 dist/
 xvault
