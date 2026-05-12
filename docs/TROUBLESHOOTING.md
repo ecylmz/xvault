@@ -9,6 +9,7 @@ xvault auth status --json
 ```
 
 Then verify `~/.config/xvault/.env` contains `XVAULT_AUTH_TOKEN` and `XVAULT_CT0`.
+If `auth status --json` reports `"valid_shape": false`, the values are missing, placeholders, or malformed even if the redacted cookie presence fields say `"present"`.
 
 ## Auth Expired
 

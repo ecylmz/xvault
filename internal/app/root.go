@@ -414,12 +414,15 @@ func dockerDaemonStatus(ctx context.Context) (bool, string) {
 func authCmd(st *state) *cobra.Command {
 	cmd := &cobra.Command{Use: "auth"}
 	cmd.AddCommand(&cobra.Command{Use: "status", RunE: func(cmd *cobra.Command, args []string) error {
-		_, src, err := auth.Resolve(cmd.Context(), st.cfg)
+		cookies, src, err := auth.Resolve(cmd.Context(), st.cfg)
 		dotenvPath := config.Expand(st.cfg.Auth.DotenvPath)
 		data := map[string]any{"cookies": auth.Status(cmd.Context(), st.cfg), "source": src.Name, "dotenv_path": dotenvPath}
 		if err != nil {
 			data["source"] = ""
 		}
+		shapeOK, shapeMsg := auth.ShapeStatus(cookies)
+		data["valid_shape"] = shapeOK
+		data["shape_message"] = shapeMsg
 		if info, statErr := os.Stat(dotenvPath); statErr == nil {
 			data["dotenv_exists"] = true
 			data["dotenv_mode"] = fmt.Sprintf("%03o", info.Mode().Perm())
@@ -430,7 +433,7 @@ func authCmd(st *state) *cobra.Command {
 		if st.json {
 			writeJSON(os.Stdout, "auth status", st.started, data)
 		} else {
-			human(os.Stdout, "auth_token=%s ct0=%s twid=%s", dataCookie(data, "auth_token"), dataCookie(data, "ct0"), dataCookie(data, "twid"))
+			human(os.Stdout, "auth_token=%s ct0=%s twid=%s valid_shape=%t", dataCookie(data, "auth_token"), dataCookie(data, "ct0"), dataCookie(data, "twid"), shapeOK)
 		}
 		return nil
 	}})

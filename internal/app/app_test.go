@@ -228,6 +228,36 @@ func TestErrorEnvelopeDoesNotLeakKnownSecretWords(t *testing.T) {
 	_ = os.Stdout
 }
 
+func TestAuthStatusReportsMalformedCookieShape(t *testing.T) {
+	t.Setenv("XVAULT_AUTH_TOKEN", "a")
+	t.Setenv("XVAULT_CT0", "c")
+	t.Setenv("XVAULT_TWID", "1")
+	code, out := executeCaptureStdout(t, []string{"--auth-source", "env", "auth", "status", "--json"})
+	if code != 0 {
+		t.Fatalf("auth status exit=%d output=%s", code, out)
+	}
+	var env Envelope
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatal(err)
+	}
+	data, ok := env.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("auth status data = %#v", env.Data)
+	}
+	if data["valid_shape"] != false || data["shape_message"] != "auth_token or ct0 malformed" {
+		t.Fatalf("auth status did not report malformed shape: %#v", data)
+	}
+	cookies, ok := data["cookies"].(map[string]any)
+	if !ok {
+		t.Fatalf("auth status cookies = %#v", data["cookies"])
+	}
+	for key, value := range cookies {
+		if value != "present" && value != "missing" {
+			t.Fatalf("cookie %s leaked value marker %#v", key, value)
+		}
+	}
+}
+
 func TestConfigSetErrorDoesNotEchoSecretValue(t *testing.T) {
 	dir := t.TempDir()
 	code, out := executeCaptureStdout(t, []string{"--config", filepath.Join(dir, "config.toml"), "config", "set", "auth.auth_token", "SECRET_VALUE", "--json"})
