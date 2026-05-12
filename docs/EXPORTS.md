@@ -10,12 +10,15 @@ xvault export markdown --collection all --output exports/markdown --json
 xvault export markdown --mode single --collection all --output archive.md --json
 xvault export hermes --output exports/hermes --json
 xvault export obsidian --output exports/obsidian --json
+xvault export obsidian --with-index-jsonl --output exports/obsidian --json
 xvault export html --collection all --output archive.html --json
 ```
 
 HTML export is a single offline file with local search and filters.
 
 Markdown defaults to `--mode files`, which writes one note per tweet under `collection/year/`. `--mode single` writes one combined Markdown file. Hermes export writes Markdown plus `index.jsonl`.
+
+Obsidian export writes collection index notes such as `Bookmarks.md`, per-tweet notes under `Bookmarks/YYYY/`, and author notes under `Authors/`. It writes `index.jsonl` only when `--with-index-jsonl` is passed.
 
 List local bookmark folder buckets before folder-filtered export:
 

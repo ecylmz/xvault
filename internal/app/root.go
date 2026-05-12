@@ -1057,9 +1057,30 @@ func exportCmd(st *state) *cobra.Command {
 		}
 		return exporter.MarkdownWithFolder(ctx, s, c, f, o, true)
 	})
-	addExport("obsidian", func(ctx context.Context, s *store.Store, c, f, o string) (map[string]any, error) {
-		return exporter.MarkdownWithFolder(ctx, s, c, f, o, false)
-	})
+	var obsidianCollection, obsidianFolder, obsidianOutput string
+	var obsidianWithIndex bool
+	obsidianCmd := &cobra.Command{Use: "obsidian", RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		data, err := exporter.ObsidianWithFolder(cmd.Context(), s, obsidianCollection, obsidianFolder, obsidianOutput, obsidianWithIndex)
+		if err != nil {
+			return err
+		}
+		if st.json {
+			writeJSON(os.Stdout, "export obsidian", st.started, data)
+		} else {
+			human(os.Stdout, "exported %s", data["output"])
+		}
+		return nil
+	}}
+	obsidianCmd.Flags().StringVar(&obsidianCollection, "collection", "all", "collection")
+	obsidianCmd.Flags().StringVar(&obsidianFolder, "folder", "", "bookmark folder")
+	obsidianCmd.Flags().StringVar(&obsidianOutput, "output", "", "output path")
+	obsidianCmd.Flags().BoolVar(&obsidianWithIndex, "with-index-jsonl", false, "also write index.jsonl")
+	cmd.AddCommand(obsidianCmd)
 	return cmd
 }
 

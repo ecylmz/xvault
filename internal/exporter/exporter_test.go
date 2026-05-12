@@ -32,6 +32,7 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	csvPath := filepath.Join(dir, "archive.csv")
 	htmlPath := filepath.Join(dir, "archive.html")
 	mdDir := filepath.Join(dir, "hermes")
+	obsidianDir := filepath.Join(dir, "obsidian")
 	if data, err := JSON(ctx, st, "all", jsonPath, true); err != nil || data["count"] != 1 {
 		t.Fatalf("json data=%#v err=%v", data, err)
 	}
@@ -48,8 +49,11 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	if data, err := MarkdownSingleWithFolder(ctx, st, "all", "", singlePath); err != nil || data["count"] != 1 || data["mode"] != "single" {
 		t.Fatalf("single markdown data=%#v err=%v", data, err)
 	}
+	if data, err := ObsidianWithFolder(ctx, st, "all", "", obsidianDir, true); err != nil || data["count"] != 1 || data["with_index_jsonl"] != true {
+		t.Fatalf("obsidian data=%#v err=%v", data, err)
+	}
 	mdPath := filepath.Join(mdDir, "bookmarks", "2026", "2026-01-01-10001-alice.md")
-	for _, path := range []string{jsonPath, csvPath, htmlPath, filepath.Join(mdDir, "index.jsonl"), mdPath, singlePath} {
+	for _, path := range []string{jsonPath, csvPath, htmlPath, filepath.Join(mdDir, "index.jsonl"), mdPath, singlePath, filepath.Join(obsidianDir, "Bookmarks.md"), filepath.Join(obsidianDir, "Bookmarks", "2026", "2026-01-01-10001-alice.md"), filepath.Join(obsidianDir, "Authors", "alice.md"), filepath.Join(obsidianDir, "index.jsonl")} {
 		b, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)

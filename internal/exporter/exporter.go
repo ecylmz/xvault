@@ -8,6 +8,7 @@ import (
 	"html"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -131,6 +132,67 @@ func MarkdownSingleWithFolder(ctx context.Context, st *store.Store, collection, 
 	return map[string]any{"output": output, "count": len(results), "mode": "single"}, nil
 }
 
+func ObsidianWithFolder(ctx context.Context, st *store.Store, collection, folder, output string, withIndexJSONL bool) (map[string]any, error) {
+	results, err := exportRows(ctx, st, collection, folder)
+	if err != nil {
+		return nil, err
+	}
+	if output == "" {
+		output = filepath.Join(os.Getenv("HOME"), ".local/share/xvault/exports/obsidian")
+	}
+	if err := os.MkdirAll(output, 0o755); err != nil {
+		return nil, err
+	}
+	collectionNotes := map[string][]model.SearchResult{}
+	authorNotes := map[string][]model.SearchResult{}
+	var index strings.Builder
+	for _, r := range results {
+		dirName := obsidianCollectionDir(r.Collections, collection)
+		collectionNotes[dirName] = append(collectionNotes[dirName], r)
+		author := r.AuthorUsername
+		if author == "" {
+			author = "unknown"
+		}
+		authorNotes[author] = append(authorNotes[author], r)
+		relDir := filepath.Join(dirName, exportYear(r.CreatedAt))
+		if err := os.MkdirAll(filepath.Join(output, relDir), 0o755); err != nil {
+			return nil, err
+		}
+		name := safeName(r.CreatedAt, r.TweetID, r.AuthorUsername) + ".md"
+		rel := filepath.Join(relDir, name)
+		if err := os.WriteFile(filepath.Join(output, rel), []byte(markdownDoc(r)), 0o644); err != nil {
+			return nil, err
+		}
+		if withIndexJSONL {
+			line, _ := json.Marshal(map[string]any{"tweet_id": r.TweetID, "path": filepath.ToSlash(rel), "text": r.TextPreview, "author": r.AuthorUsername, "collections": r.Collections})
+			index.Write(line)
+			index.WriteByte('\n')
+		}
+	}
+	for _, dirName := range sortedKeys(collectionNotes) {
+		if err := writeObsidianCollectionIndex(output, dirName, collectionNotes[dirName]); err != nil {
+			return nil, err
+		}
+	}
+	if len(authorNotes) > 0 {
+		authorsDir := filepath.Join(output, "Authors")
+		if err := os.MkdirAll(authorsDir, 0o755); err != nil {
+			return nil, err
+		}
+		for _, author := range sortedKeys(authorNotes) {
+			if err := writeObsidianAuthorIndex(authorsDir, author, authorNotes[author]); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if withIndexJSONL {
+		if err := os.WriteFile(filepath.Join(output, "index.jsonl"), []byte(index.String()), 0o644); err != nil {
+			return nil, err
+		}
+	}
+	return map[string]any{"output": output, "count": len(results), "with_index_jsonl": withIndexJSONL}, nil
+}
+
 func HTML(ctx context.Context, st *store.Store, collection, output string) (map[string]any, error) {
 	return HTMLWithFolder(ctx, st, collection, "", output)
 }
@@ -227,6 +289,59 @@ func collectionDir(cols []string, fallback string) string {
 	return "all"
 }
 
+func obsidianCollectionDir(cols []string, fallback string) string {
+	switch collectionDir(cols, fallback) {
+	case "bookmarks":
+		return "Bookmarks"
+	case "likes":
+		return "Likes"
+	case "tweets":
+		return "Tweets"
+	case "posts":
+		return "Tweets"
+	case "reposts":
+		return "Reposts"
+	case "replies":
+		return "Replies"
+	case "feed":
+		return "Feed"
+	default:
+		return "All"
+	}
+}
+
+func writeObsidianCollectionIndex(output, dirName string, rows []model.SearchResult) error {
+	var b strings.Builder
+	b.WriteString("# " + dirName + "\n\n")
+	b.WriteString(fmt.Sprintf("%d records exported.\n\n", len(rows)))
+	for _, r := range rows {
+		rel := filepath.ToSlash(filepath.Join(dirName, exportYear(r.CreatedAt), safeName(r.CreatedAt, r.TweetID, r.AuthorUsername)+".md"))
+		b.WriteString(fmt.Sprintf("- [%s](%s) @%s\n", r.TweetID, rel, r.AuthorUsername))
+	}
+	return os.WriteFile(filepath.Join(output, dirName+".md"), []byte(b.String()), 0o644)
+}
+
+func writeObsidianAuthorIndex(authorsDir, author string, rows []model.SearchResult) error {
+	var b strings.Builder
+	b.WriteString("# @" + author + "\n\n")
+	b.WriteString(fmt.Sprintf("%d records exported.\n\n", len(rows)))
+	for _, r := range rows {
+		dirName := obsidianCollectionDir(r.Collections, "all")
+		rel := filepath.ToSlash(filepath.Join("..", dirName, exportYear(r.CreatedAt), safeName(r.CreatedAt, r.TweetID, r.AuthorUsername)+".md"))
+		b.WriteString(fmt.Sprintf("- [%s](%s) %s\n", r.TweetID, rel, r.TextPreview))
+	}
+	return os.WriteFile(filepath.Join(authorsDir, safeSegment(author)+".md"), []byte(b.String()), 0o644)
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func exportYear(created string) string {
 	_, year := exportDateParts(created)
 	return year
@@ -245,6 +360,18 @@ func exportDateParts(created string) (string, string) {
 func strconvQuote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+
+func safeSegment(s string) string {
+	if s == "" {
+		return "unknown"
+	}
+	return strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' {
+			return r
+		}
+		return '-'
+	}, s)
 }
 
 func Escape(s string) string { return html.EscapeString(s) }
