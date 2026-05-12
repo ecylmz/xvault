@@ -183,6 +183,33 @@ func TestConfigSetErrorDoesNotEchoSecretValue(t *testing.T) {
 	}
 }
 
+func TestConfigGetSetNonSecretDefaults(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.toml")
+	code, out := executeCaptureStdout(t, []string{"--config", cfgPath, "config", "set", "sync.feed_default_hours", "12", "--json"})
+	if code != 0 {
+		t.Fatalf("config set exit=%d output=%s", code, out)
+	}
+	if !strings.Contains(out, `"value":12`) {
+		t.Fatalf("config set output = %s", out)
+	}
+	code, out = executeCaptureStdout(t, []string{"--config", cfgPath, "config", "get", "sync.feed_default_hours", "--json"})
+	if code != 0 {
+		t.Fatalf("config get exit=%d output=%s", code, out)
+	}
+	if !strings.Contains(out, `"value":12`) {
+		t.Fatalf("config get output = %s", out)
+	}
+	code, out = executeCaptureStdout(t, []string{"--config", cfgPath, "config", "set", "agent.json_default", "true", "--json"})
+	if code != 0 {
+		t.Fatalf("config bool set exit=%d output=%s", code, out)
+	}
+	code, out = executeCaptureStdout(t, []string{"--config", cfgPath, "config", "get", "agent.json_default", "--json"})
+	if code != 0 || !strings.Contains(out, `"value":true`) {
+		t.Fatalf("config bool get exit=%d output=%s", code, out)
+	}
+}
+
 func TestSyncCountForCollectionUsesConfigDefaults(t *testing.T) {
 	cfg := config.Default()
 	count, all := syncCountForCollection(cfg, "likes", 100, false, false)

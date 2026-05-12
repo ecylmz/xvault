@@ -1517,8 +1517,50 @@ func getConfigValue(cfg config.Config, key string) any {
 		return cfg.Auth.DotenvPath
 	case "sync.default_count":
 		return cfg.Sync.DefaultCount
+	case "sync.default_like_count":
+		return cfg.Sync.DefaultLikeCount
+	case "sync.default_bookmark_count":
+		return cfg.Sync.DefaultBookmarkCount
+	case "sync.request_delay_ms":
+		return cfg.Sync.RequestDelayMS
+	case "sync.max_retries":
+		return cfg.Sync.MaxRetries
+	case "sync.stop_after_consecutive_rate_limits":
+		return cfg.Sync.StopAfterRateLimits
+	case "sync.store_raw":
+		return cfg.Sync.StoreRaw
+	case "sync.checkpoint_every_items":
+		return cfg.Sync.CheckpointEveryItems
+	case "sync.checkpoint_every_pages":
+		return cfg.Sync.CheckpointEveryPages
+	case "sync.default_thread_limit":
+		return cfg.Sync.DefaultThreadLimit
+	case "sync.default_conversation_limit":
+		return cfg.Sync.DefaultConversationLimit
+	case "sync.feed_default_hours":
+		return cfg.Sync.FeedDefaultHours
+	case "database.wal":
+		return cfg.Database.WAL
+	case "database.busy_timeout_ms":
+		return cfg.Database.BusyTimeoutMS
+	case "database.foreign_keys":
+		return cfg.Database.ForeignKeys
+	case "export.dir":
+		return cfg.Export.Dir
+	case "export.markdown_layout":
+		return cfg.Export.MarkdownLayout
+	case "export.overwrite":
+		return cfg.Export.Overwrite
+	case "export.html_warn_size_mb":
+		return cfg.Export.HTMLWarnSizeMB
 	case "agent.safe_mode":
 		return cfg.Agent.SafeMode
+	case "agent.json_default":
+		return cfg.Agent.JSONDefault
+	case "agent.allow_direct_db":
+		return cfg.Agent.AllowDirectDB
+	case "agent.allow_raw_output":
+		return cfg.Agent.AllowRawOutput
 	default:
 		if n, err := strconv.Atoi(key); err == nil {
 			return n
@@ -1539,18 +1581,124 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 			return err
 		}
 		cfg.Sync.DefaultCount = n
+	case "sync.default_like_count":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.DefaultLikeCount = n
+	case "sync.default_bookmark_count":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.DefaultBookmarkCount = n
 	case "sync.request_delay_ms":
 		n, err := strconv.Atoi(value)
 		if err != nil {
 			return err
 		}
 		cfg.Sync.RequestDelayMS = n
+	case "sync.max_retries":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.MaxRetries = n
+	case "sync.stop_after_consecutive_rate_limits":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.StopAfterRateLimits = n
+	case "sync.store_raw":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.StoreRaw = b
+	case "sync.checkpoint_every_items":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.CheckpointEveryItems = n
+	case "sync.checkpoint_every_pages":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.CheckpointEveryPages = n
+	case "sync.default_thread_limit":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.DefaultThreadLimit = n
+	case "sync.default_conversation_limit":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.DefaultConversationLimit = n
+	case "sync.feed_default_hours":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Sync.FeedDefaultHours = n
+	case "database.wal":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.Database.WAL = b
+	case "database.busy_timeout_ms":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Database.BusyTimeoutMS = n
+	case "database.foreign_keys":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.Database.ForeignKeys = b
+	case "export.dir":
+		cfg.Export.Dir = value
+	case "export.markdown_layout":
+		cfg.Export.MarkdownLayout = value
+	case "export.overwrite":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.Export.Overwrite = b
+	case "export.html_warn_size_mb":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		cfg.Export.HTMLWarnSizeMB = n
 	case "agent.safe_mode":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
 			return err
 		}
 		cfg.Agent.SafeMode = b
+	case "agent.json_default":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.Agent.JSONDefault = b
+	case "agent.allow_direct_db":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.Agent.AllowDirectDB = b
 	case "agent.allow_raw_output":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
