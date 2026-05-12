@@ -109,13 +109,13 @@ go build -trimpath -o bin/xvault ./cmd/xvault
 ## First Run
 
 ```bash
-bin/xvault init
-bin/xvault auth status --json
-bin/xvault --auth-source firefox auth test --json
-bin/xvault doctor --json
-bin/xvault sync bookmarks --count 100 --max-pages 2 --json
-bin/xvault sync likes --count 100 --max-pages 2 --json
-bin/xvault search "llm agents" --source all --limit 10 --json
+xvault init
+xvault auth status --json
+xvault --auth-source firefox auth test --json
+xvault doctor --json
+xvault sync bookmarks --count 100 --max-pages 2 --json
+xvault sync likes --count 100 --max-pages 2 --json
+xvault search "llm agents" --source all --limit 10 --json
 ```
 
 ## Local Data

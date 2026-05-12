@@ -7,6 +7,7 @@ All notable changes to xvault are documented here. Release notes are generated f
 ### Documentation
 
 - Document release binary installation with checksum verification for macOS and Linux.
+- Use installed `xvault` commands in the README first-run examples.
 
 ### Fixed
 
