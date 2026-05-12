@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/ecylmz/xvault/internal/config"
@@ -29,10 +31,23 @@ func ShapeStatus(c Cookies) (bool, string) {
 	if len(c.AuthToken) < 8 || len(c.CT0) < 8 {
 		return false, "auth_token or ct0 malformed"
 	}
-	if c.TWID != "" && (!strings.HasPrefix(c.TWID, "u=") || len(c.TWID) < 4) {
+	if c.TWID != "" && !validTWIDShape(c.TWID) {
 		return false, "twid malformed"
 	}
 	return true, "auth_token=present, ct0=present, twid=" + presence(c.TWID)
+}
+
+func validTWIDShape(twid string) bool {
+	twid = strings.Trim(twid, `"`)
+	if decoded, err := url.QueryUnescape(twid); err == nil {
+		twid = decoded
+	}
+	twid = strings.TrimPrefix(twid, "u=")
+	if len(twid) < 1 {
+		return false
+	}
+	_, err := strconv.ParseInt(twid, 10, 64)
+	return err == nil
 }
 
 func RedactSecret(s string) string {

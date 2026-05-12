@@ -87,6 +87,13 @@ func TestShapeStatusAcceptsRealisticCookies(t *testing.T) {
 	}
 }
 
+func TestShapeStatusAcceptsEncodedTWID(t *testing.T) {
+	ok, msg := ShapeStatus(Cookies{AuthToken: strings.Repeat("a", 40), CT0: strings.Repeat("c", 32), TWID: "u%3D12345"})
+	if !ok {
+		t.Fatalf("expected encoded twid to pass: %s", msg)
+	}
+}
+
 func TestResolveFirefoxFromPatterns(t *testing.T) {
 	dir := t.TempDir()
 	profile := filepath.Join(dir, "profile.default")
