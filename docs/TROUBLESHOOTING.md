@@ -10,7 +10,7 @@ xvault auth status --json
 
 Then verify `~/.config/xvault/.env` contains `XVAULT_AUTH_TOKEN` and `XVAULT_CT0`.
 If `auth status --json` reports `"valid_shape": false`, the values are missing, placeholders, or malformed even if the redacted cookie presence fields say `"present"`.
-`auth test --json` reports `AUTH_MALFORMED` for this state without sending the malformed cookies to X.
+`auth test --json` and `auth import-env --json` report `AUTH_MALFORMED` for this state without sending malformed cookies to X or writing them to the dotenv file.
 
 ## Auth Expired
 

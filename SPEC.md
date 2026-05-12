@@ -491,7 +491,7 @@ Every command with `--json` must return a single JSON object. No progress bars, 
 | 1 | Generic error |
 | 2 | Invalid CLI arguments |
 | 3 | Config error |
-| 4 | Auth missing/expired |
+| 4 | Auth missing/malformed/expired |
 | 5 | Network error |
 | 6 | Rate limited |
 | 7 | Query ID refresh failed |
@@ -2025,6 +2025,7 @@ Error categories:
 | Code | Behavior |
 |---|---|
 | `AUTH_MISSING` | Stop; tell user to configure cookies |
+| `AUTH_MALFORMED` | Stop before network access; tell user to replace malformed or placeholder cookie values |
 | `AUTH_EXPIRED` | Stop; tell user to refresh cookies |
 | `RATE_LIMITED` | Stop after threshold; checkpoint retained |
 | `QUERY_ID_STALE` | Refresh and retry |

@@ -271,6 +271,29 @@ func TestAuthTestRejectsMalformedCookieShape(t *testing.T) {
 	}
 }
 
+func TestAuthImportEnvRejectsMalformedCookieShape(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XVAULT_AUTH_TOKEN", "a")
+	t.Setenv("XVAULT_CT0", "c")
+	t.Setenv("XVAULT_TWID", "1")
+	cfgPath := filepath.Join(dir, "config.toml")
+	dotenvPath := filepath.Join(dir, ".env")
+	code, out := executeCaptureStdout(t, []string{"--config", cfgPath, "config", "set", "auth.dotenv_path", dotenvPath, "--json"})
+	if code != 0 {
+		t.Fatalf("config set exit=%d output=%s", code, out)
+	}
+	code, out = executeCaptureStdout(t, []string{"--config", cfgPath, "--auth-source", "env", "auth", "import-env", "--force", "--json"})
+	if code != 4 {
+		t.Fatalf("auth import-env exit=%d output=%s", code, out)
+	}
+	if !strings.Contains(out, `"code":"AUTH_MALFORMED"`) {
+		t.Fatalf("auth import-env did not report malformed auth: %s", out)
+	}
+	if _, err := os.Stat(dotenvPath); !os.IsNotExist(err) {
+		t.Fatalf("malformed import should not write dotenv, stat err=%v", err)
+	}
+}
+
 func TestConfigSetErrorDoesNotEchoSecretValue(t *testing.T) {
 	dir := t.TempDir()
 	code, out := executeCaptureStdout(t, []string{"--config", filepath.Join(dir, "config.toml"), "config", "set", "auth.auth_token", "SECRET_VALUE", "--json"})

@@ -464,6 +464,9 @@ func authCmd(st *state) *cobra.Command {
 		if c.AuthToken == "" || c.CT0 == "" {
 			return auth.ErrMissing
 		}
+		if ok, msg := auth.ShapeStatus(c); !ok {
+			return errCode("AUTH_MALFORMED", msg)
+		}
 		if !force {
 			if _, err := os.Stat(path); err == nil {
 				return fmt.Errorf("dotenv file already exists at %s; pass --force to overwrite it", path)
