@@ -361,13 +361,95 @@ func (s *Store) Show(ctx context.Context, id string) (map[string]any, error) {
 		return nil, err
 	}
 	cols, folder := s.collections(ctx, id)
+	urls, err := s.tweetURLs(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	media, err := s.tweetMedia(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	quotedSummary, err := s.tweetSummary(ctx, quoted)
+	if err != nil {
+		return nil, err
+	}
+	repostedID, repostedSummary, err := s.repostedTweetSummary(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"tweet_id": id, "text": text, "lang": lang, "author_id": authorID, "author_username": username,
 		"author_display_name": display, "created_at": created, "conversation_id": conv, "quoted_tweet_id": quoted,
 		"collections": cols, "bookmark_folder_name": folder, "url": CanonicalURL(username, id),
 		"metrics":            map[string]int64{"reply_count": reply, "repost_count": retweet, "like_count": like, "quote_count": quote},
-		"raw_json_available": raw != "", "raw_json_id": raw,
+		"links":              urls,
+		"media":              media,
+		"quoted_tweet":       quotedSummary,
+		"reposted_tweet_id":  repostedID,
+		"reposted_tweet":     repostedSummary,
+		"raw_json_available": raw != "",
+		"raw_json_id":        raw,
 	}, nil
+}
+
+func (s *Store) tweetURLs(ctx context.Context, tweetID string) ([]model.URL, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT url, COALESCE(expanded_url,''), COALESCE(display_url,'') FROM urls WHERE tweet_id=? ORDER BY id`, tweetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.URL{}
+	for rows.Next() {
+		u := model.URL{TweetID: tweetID}
+		if err := rows.Scan(&u.URL, &u.ExpandedURL, &u.DisplayURL); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) tweetMedia(ctx context.Context, tweetID string) ([]model.Media, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, media_type, COALESCE(url,''), COALESCE(expanded_url,''), COALESCE(preview_url,''), COALESCE(alt_text,'') FROM media WHERE tweet_id=? ORDER BY id`, tweetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.Media{}
+	for rows.Next() {
+		m := model.Media{TweetID: tweetID}
+		if err := rows.Scan(&m.ID, &m.MediaType, &m.URL, &m.ExpandedURL, &m.PreviewURL, &m.AltText); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) tweetSummary(ctx context.Context, tweetID string) (map[string]any, error) {
+	if tweetID == "" {
+		return nil, nil
+	}
+	row := s.db.QueryRowContext(ctx, `SELECT t.id, t.text, COALESCE(u.username,''), COALESCE(u.display_name,''), COALESCE(t.created_at,''), t.is_tombstone, COALESCE(t.tombstone_reason,'') FROM tweets t LEFT JOIN users u ON u.id=t.author_id WHERE t.id=?`, tweetID)
+	var id, text, username, display, created, reason string
+	var tombstone int
+	if err := row.Scan(&id, &text, &username, &display, &created, &tombstone, &reason); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return map[string]any{"tweet_id": id, "text": text, "author_username": username, "author_display_name": display, "created_at": created, "url": CanonicalURL(username, id), "is_tombstone": tombstone != 0, "tombstone_reason": reason}, nil
+}
+
+func (s *Store) repostedTweetSummary(ctx context.Context, tweetID string) (string, map[string]any, error) {
+	var repostedID string
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(retweeted_tweet_id,'') FROM tweets WHERE id=?`, tweetID).Scan(&repostedID)
+	if err != nil {
+		return "", nil, err
+	}
+	summary, err := s.tweetSummary(ctx, repostedID)
+	return repostedID, summary, err
 }
 
 func (s *Store) RawPayload(ctx context.Context, id string) (json.RawMessage, error) {

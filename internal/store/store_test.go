@@ -237,6 +237,47 @@ func TestShowByURLThreadAndVacuum(t *testing.T) {
 	}
 }
 
+func TestShowIncludesLinksMediaAndQuotedSummary(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	page := model.ParsedPage{
+		Users: []model.User{{ID: "u1", Username: "alice", DisplayName: "Alice"}, {ID: "u2", Username: "bob", DisplayName: "Bob"}},
+		Tweets: []model.Tweet{
+			{ID: "10001", Text: "outer tweet", AuthorID: "u1", AuthorUsername: "alice", QuotedTweetID: "10002", IsQuote: true, RawJSONID: "raw1"},
+			{ID: "10002", Text: "quoted tweet", AuthorID: "u2", AuthorUsername: "bob"},
+		},
+		Collections: []model.CollectionItem{{TweetID: "10001", CollectionType: "bookmark"}},
+		URLs:        []model.URL{{TweetID: "10001", URL: "https://t.co/a", ExpandedURL: "https://example.com/a", DisplayURL: "example.com/a"}},
+		Media:       []model.Media{{ID: "m1", TweetID: "10001", MediaType: "photo", URL: "https://pbs.twimg.com/a.jpg", PreviewURL: "https://pbs.twimg.com/a.jpg", AltText: "Alt text"}},
+	}
+	if err := s.UpsertPage(ctx, page); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Show(ctx, "10001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	links, ok := got["links"].([]model.URL)
+	if !ok || len(links) != 1 || links[0].ExpandedURL != "https://example.com/a" {
+		t.Fatalf("links = %#v", got["links"])
+	}
+	media, ok := got["media"].([]model.Media)
+	if !ok || len(media) != 1 || media[0].AltText != "Alt text" {
+		t.Fatalf("media = %#v", got["media"])
+	}
+	quoted, ok := got["quoted_tweet"].(map[string]any)
+	if !ok || quoted["tweet_id"] != "10002" || quoted["author_username"] != "bob" {
+		t.Fatalf("quoted = %#v", got["quoted_tweet"])
+	}
+	if got["raw_json_available"] != true {
+		t.Fatalf("raw flag = %#v", got["raw_json_available"])
+	}
+}
+
 func TestSearchWithMediaAndLinkFilters(t *testing.T) {
 	ctx := context.Background()
 	s, err := Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
