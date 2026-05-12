@@ -60,12 +60,27 @@ if [ -n "$run_id" ]; then
   gh run watch "$run_id" --exit-status
 fi
 
+release_visible=""
 for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
   if gh release view "$version" --json tagName,url,publishedAt; then
-    exit 0
+    release_visible=1
+    break
   fi
   sleep 5
 done
 
-printf '%s\n' "release was not visible on GitHub after waiting: $version" >&2
-exit 1
+if [ -z "$release_visible" ]; then
+  printf '%s\n' "release was not visible on GitHub after waiting: $version" >&2
+  exit 1
+fi
+
+gh workflow run update-formula.yml \
+  --repo ecylmz/homebrew-tap \
+  -f formula=xvault \
+  -f tag="$version" \
+  -f repository=ecylmz/xvault \
+  -f artifact_template='{formula}-{target}.tar.gz' \
+  -f target_aliases='darwin_arm64=darwin-arm64,darwin_amd64=darwin-amd64,linux_arm64=linux-arm64,linux_amd64=linux-amd64'
+
+printf '%s\n' "triggered Homebrew tap formula update for $version"
+exit 0
