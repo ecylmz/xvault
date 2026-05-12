@@ -3,6 +3,7 @@ package exporter
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -185,6 +186,56 @@ func TestExportsRenderQuotedTweetContent(t *testing.T) {
 	}
 	if !strings.Contains(string(htmlDoc), "quoted_text_preview") || !strings.Contains(string(htmlDoc), "quoted inner text") {
 		t.Fatalf("html quoted content missing: %s", htmlDoc)
+	}
+}
+
+func TestHTMLFailOnLarge(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	page := model.ParsedPage{
+		Users:       []model.User{{ID: "u1", Username: "alice"}},
+		Tweets:      []model.Tweet{{ID: "10001", Text: "large html fixture", AuthorID: "u1", AuthorUsername: "alice"}},
+		Collections: []model.CollectionItem{{TweetID: "10001", CollectionType: "bookmark"}},
+	}
+	if err := st.UpsertPage(ctx, page); err != nil {
+		t.Fatal(err)
+	}
+	data, err := HTMLWithFolderOptions(ctx, st, "all", "", "", 1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data["html_size_bytes"] == nil || data["html_warn_size_mb"] != 1 {
+		t.Fatalf("html metadata = %#v", data)
+	}
+	if _, err := HTMLWithFolderOptions(ctx, st, "all", "", "", 1, true); err != nil {
+		t.Fatalf("1 MiB threshold should not fail: %v", err)
+	}
+	if _, err := HTMLWithFolderOptions(ctx, st, "all", "", "", -1, true); err != nil {
+		t.Fatalf("negative threshold disables limit: %v", err)
+	}
+	if _, err := HTMLWithFolderOptions(ctx, st, "all", "", "", 0, true); err != nil {
+		t.Fatalf("zero threshold disables limit: %v", err)
+	}
+	large := model.ParsedPage{
+		Users: []model.User{{ID: "u1", Username: "alice"}},
+	}
+	for i := 0; i < 4000; i++ {
+		id := fmt.Sprintf("2%04d", i)
+		large.Tweets = append(large.Tweets, model.Tweet{ID: id, Text: strings.Repeat("large html row ", 30), AuthorID: "u1", AuthorUsername: "alice"})
+		large.Collections = append(large.Collections, model.CollectionItem{TweetID: id, CollectionType: "bookmark"})
+	}
+	if err := st.UpsertPage(ctx, large); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := HTMLWithFolderOptions(ctx, st, "all", "", "", 1, false); err != nil || data["large_file_warning"] != true {
+		t.Fatalf("large html warning data=%#v err=%v", data, err)
+	}
+	if _, err := HTMLWithFolderOptions(ctx, st, "all", "", "", 1, true); err == nil {
+		t.Fatal("expected fail-on-large to reject oversized HTML")
 	}
 }
 

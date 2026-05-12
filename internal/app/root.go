@@ -1028,7 +1028,33 @@ func exportCmd(st *state) *cobra.Command {
 	jsonCmd.Flags().BoolVar(&pretty, "pretty", false, "pretty JSON")
 	cmd.AddCommand(jsonCmd)
 	addExport("csv", exporter.CSVWithFolder)
-	addExport("html", exporter.HTMLWithFolder)
+	var htmlCollection, htmlFolder, htmlOutput string
+	var htmlFailOnLarge bool
+	htmlCmd := &cobra.Command{Use: "html", RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		data, err := exporter.HTMLWithFolderOptions(cmd.Context(), s, htmlCollection, htmlFolder, htmlOutput, st.cfg.Export.HTMLWarnSizeMB, htmlFailOnLarge)
+		if err != nil {
+			return err
+		}
+		if st.json {
+			writeJSON(os.Stdout, "export html", st.started, data)
+		} else {
+			if data["large_file_warning"] == true {
+				human(os.Stderr, "warning: HTML export is larger than %d MiB", st.cfg.Export.HTMLWarnSizeMB)
+			}
+			human(os.Stdout, "exported %s", data["output"])
+		}
+		return nil
+	}}
+	htmlCmd.Flags().StringVar(&htmlCollection, "collection", "all", "collection")
+	htmlCmd.Flags().StringVar(&htmlFolder, "folder", "", "bookmark folder")
+	htmlCmd.Flags().StringVar(&htmlOutput, "output", "", "output path")
+	htmlCmd.Flags().BoolVar(&htmlFailOnLarge, "fail-on-large", false, "fail if estimated HTML size exceeds export.html_warn_size_mb")
+	cmd.AddCommand(htmlCmd)
 	var markdownCollection, markdownFolder, markdownOutput, markdownMode string
 	markdownCmd := &cobra.Command{Use: "markdown", RunE: func(cmd *cobra.Command, args []string) error {
 		s, err := store.Open(config.Expand(st.cfg.Database.Path))
