@@ -311,7 +311,7 @@ func (s *Store) SearchWithFilters(ctx context.Context, query, source, author, fo
 	joinFTS := false
 	if strings.TrimSpace(query) != "" {
 		joinFTS = true
-		where = append(where, "f.text MATCH ?")
+		where = append(where, "tweets_fts.text MATCH ?")
 		args = append(args, query)
 	}
 	if source != "" && source != "all" {
@@ -340,14 +340,29 @@ func (s *Store) SearchWithFilters(ctx context.Context, query, source, author, fo
 	if hasLink {
 		where = append(where, "EXISTS(SELECT 1 FROM urls ur WHERE ur.tweet_id=t.id)")
 	}
+	ftsScore := "0.0"
+	if joinFTS {
+		ftsScore = "(-bm25(tweets_fts) * 1000.0)"
+	}
+	priorityScore := `(CASE
+WHEN EXISTS (SELECT 1 FROM collections c WHERE c.tweet_id=t.id AND c.collection_type='bookmark') THEN 600.0
+WHEN EXISTS (SELECT 1 FROM collections c WHERE c.tweet_id=t.id AND c.collection_type='like') THEN 500.0
+WHEN EXISTS (SELECT 1 FROM collections c WHERE c.tweet_id=t.id AND c.collection_type='tweet') THEN 400.0
+WHEN EXISTS (SELECT 1 FROM collections c WHERE c.tweet_id=t.id AND c.collection_type='repost') THEN 300.0
+WHEN EXISTS (SELECT 1 FROM collections c WHERE c.tweet_id=t.id AND c.collection_type='reply') THEN 200.0
+WHEN EXISTS (SELECT 1 FROM collections c WHERE c.tweet_id=t.id AND c.collection_type='feed') THEN 100.0
+ELSE 0.0 END)`
+	engagementScore := `((t.reply_count * 2.0) + (t.retweet_count * 3.0) + (t.like_count * 0.1) + (t.quote_count * 2.0))`
+	scoreExpr := `(` + ftsScore + ` + ` + priorityScore + ` + ` + engagementScore + `)`
 	sqlText := `SELECT t.id, t.text, COALESCE(u.username,''), COALESCE(u.display_name,''), COALESCE(t.created_at,''), COALESCE(t.quoted_tweet_id,''), COALESCE(qt.text,''), COALESCE(qu.username,''), COALESCE(qu.display_name,''), COALESCE(t.conversation_id,''),
 t.reply_count, t.retweet_count, t.like_count, t.quote_count,
+` + scoreExpr + `,
 EXISTS(SELECT 1 FROM media m WHERE m.tweet_id=t.id), EXISTS(SELECT 1 FROM urls ur WHERE ur.tweet_id=t.id)
 FROM tweets t LEFT JOIN users u ON u.id=t.author_id LEFT JOIN tweets qt ON qt.id=t.quoted_tweet_id AND qt.is_tombstone=0 LEFT JOIN users qu ON qu.id=qt.author_id `
 	if joinFTS {
-		sqlText += `JOIN tweets_fts_map fm ON fm.tweet_id=t.id JOIN tweets_fts f ON f.rowid=fm.rowid `
+		sqlText += `JOIN tweets_fts_map fm ON fm.tweet_id=t.id JOIN tweets_fts ON tweets_fts.rowid=fm.rowid `
 	}
-	sqlText += `WHERE ` + strings.Join(where, " AND ") + ` ORDER BY COALESCE(t.created_at,'') DESC, t.id DESC LIMIT ? OFFSET ?`
+	sqlText += `WHERE ` + strings.Join(where, " AND ") + ` ORDER BY ` + scoreExpr + ` DESC, COALESCE(t.created_at,'') DESC, (t.reply_count + t.retweet_count + t.like_count + t.quote_count) DESC, t.id DESC LIMIT ? OFFSET ?`
 	args = append(args, limit, offset)
 	rows, err := s.db.QueryContext(ctx, sqlText, args...)
 	if err != nil {
@@ -357,7 +372,7 @@ FROM tweets t LEFT JOIN users u ON u.id=t.author_id LEFT JOIN tweets qt ON qt.id
 	out := []model.SearchResult{}
 	for rows.Next() {
 		var r model.SearchResult
-		if err := rows.Scan(&r.TweetID, &r.TextPreview, &r.AuthorUsername, &r.AuthorDisplayName, &r.CreatedAt, &r.QuotedTweetID, &r.QuotedTextPreview, &r.QuotedAuthorUsername, &r.QuotedAuthorDisplayName, &r.ConversationID, &r.ReplyCount, &r.RepostCount, &r.LikeCount, &r.QuoteCount, &r.HasMedia, &r.HasLinks); err != nil {
+		if err := rows.Scan(&r.TweetID, &r.TextPreview, &r.AuthorUsername, &r.AuthorDisplayName, &r.CreatedAt, &r.QuotedTweetID, &r.QuotedTextPreview, &r.QuotedAuthorUsername, &r.QuotedAuthorDisplayName, &r.ConversationID, &r.ReplyCount, &r.RepostCount, &r.LikeCount, &r.QuoteCount, &r.Score, &r.HasMedia, &r.HasLinks); err != nil {
 			return nil, err
 		}
 		r.URL = CanonicalURL(r.AuthorUsername, r.TweetID)

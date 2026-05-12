@@ -350,6 +350,42 @@ func TestSearchWithMediaAndLinkFilters(t *testing.T) {
 	if len(results) != 1 || !results[0].HasMedia || !results[0].HasLinks {
 		t.Fatalf("filtered results = %#v", results)
 	}
+	if results[0].Score <= 0 {
+		t.Fatalf("score = %v", results[0].Score)
+	}
+}
+
+func TestSearchRankingUsesCollectionPriority(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "xvault.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	page := model.ParsedPage{
+		Users: []model.User{{ID: "u1", Username: "alice"}},
+		Tweets: []model.Tweet{
+			{ID: "10001", Text: "ranking fixture", AuthorID: "u1", AuthorUsername: "alice", CreatedAt: "2026-01-01T00:00:00Z"},
+			{ID: "10002", Text: "ranking fixture", AuthorID: "u1", AuthorUsername: "alice", CreatedAt: "2026-01-02T00:00:00Z"},
+		},
+		Collections: []model.CollectionItem{
+			{TweetID: "10001", CollectionType: "bookmark"},
+			{TweetID: "10002", CollectionType: "like"},
+		},
+	}
+	if err := s.UpsertPage(ctx, page); err != nil {
+		t.Fatal(err)
+	}
+	results, err := s.Search(ctx, "ranking", "all", "", "", 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("results = %#v", results)
+	}
+	if results[0].TweetID != "10001" || results[0].Score <= results[1].Score {
+		t.Fatalf("ranked results = %#v", results)
+	}
 }
 
 func TestRawPayloadRoundTrip(t *testing.T) {
