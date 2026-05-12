@@ -25,7 +25,14 @@ func JSONWithFolder(ctx context.Context, st *store.Store, collection, folder, ou
 	if err != nil {
 		return nil, err
 	}
+	related, err := exportRelatedData(ctx, st, results)
+	if err != nil {
+		return nil, err
+	}
 	doc := map[string]any{"schema_version": 1, "exported_at": time.Now().UTC().Format(time.RFC3339), "collection": collection, "folder": folder, "count": len(results), "tweets": results}
+	for k, v := range related {
+		doc[k] = v
+	}
 	var b []byte
 	if pretty {
 		b, err = json.MarshalIndent(doc, "", "  ")
@@ -41,6 +48,139 @@ func JSONWithFolder(ctx context.Context, st *store.Store, collection, folder, ou
 		}
 	}
 	return map[string]any{"output": output, "count": len(results)}, nil
+}
+
+func exportRelatedData(ctx context.Context, st *store.Store, results []model.SearchResult) (map[string]any, error) {
+	tweetIDs := relatedTweetIDs(results)
+	if len(tweetIDs) == 0 {
+		return map[string]any{"users": []model.User{}, "media": []model.Media{}, "urls": []model.URL{}, "threads": []map[string]any{}}, nil
+	}
+	ph := placeholders(len(tweetIDs))
+	args := stringArgs(tweetIDs)
+	users, err := exportUsers(ctx, st, ph, args)
+	if err != nil {
+		return nil, err
+	}
+	media, err := exportMedia(ctx, st, ph, args)
+	if err != nil {
+		return nil, err
+	}
+	urls, err := exportURLs(ctx, st, ph, args)
+	if err != nil {
+		return nil, err
+	}
+	threads, err := exportThreads(ctx, st, ph, args)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"users": users, "media": media, "urls": urls, "threads": threads}, nil
+}
+
+func relatedTweetIDs(results []model.SearchResult) []string {
+	seen := map[string]bool{}
+	var ids []string
+	add := func(id string) {
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	for _, r := range results {
+		add(r.TweetID)
+		add(r.QuotedTweetID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func placeholders(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strings.TrimRight(strings.Repeat("?,", n), ",")
+}
+
+func stringArgs(values []string) []any {
+	args := make([]any, len(values))
+	for i, v := range values {
+		args[i] = v
+	}
+	return args
+}
+
+func exportUsers(ctx context.Context, st *store.Store, ph string, args []any) ([]model.User, error) {
+	rows, err := st.DB().QueryContext(ctx, `SELECT DISTINCT u.id, COALESCE(u.username,''), COALESCE(u.display_name,''), COALESCE(u.avatar_url,''), u.verified, u.protected
+FROM users u JOIN tweets t ON t.author_id=u.id WHERE t.id IN (`+ph+`) ORDER BY u.username, u.id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.User{}
+	for rows.Next() {
+		var u model.User
+		var verified, protected int
+		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarURL, &verified, &protected); err != nil {
+			return nil, err
+		}
+		u.Verified = verified != 0
+		u.Protected = protected != 0
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+func exportMedia(ctx context.Context, st *store.Store, ph string, args []any) ([]model.Media, error) {
+	rows, err := st.DB().QueryContext(ctx, `SELECT id, tweet_id, media_type, COALESCE(url,''), COALESCE(expanded_url,''), COALESCE(preview_url,''), COALESCE(alt_text,'') FROM media WHERE tweet_id IN (`+ph+`) ORDER BY tweet_id, id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.Media{}
+	for rows.Next() {
+		var m model.Media
+		if err := rows.Scan(&m.ID, &m.TweetID, &m.MediaType, &m.URL, &m.ExpandedURL, &m.PreviewURL, &m.AltText); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func exportURLs(ctx context.Context, st *store.Store, ph string, args []any) ([]model.URL, error) {
+	rows, err := st.DB().QueryContext(ctx, `SELECT tweet_id, url, COALESCE(expanded_url,''), COALESCE(display_url,'') FROM urls WHERE tweet_id IN (`+ph+`) ORDER BY tweet_id, id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.URL{}
+	for rows.Next() {
+		var u model.URL
+		if err := rows.Scan(&u.TweetID, &u.URL, &u.ExpandedURL, &u.DisplayURL); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+func exportThreads(ctx context.Context, st *store.Store, ph string, args []any) ([]map[string]any, error) {
+	rows, err := st.DB().QueryContext(ctx, `SELECT DISTINCT th.id, th.thread_type, th.mode, th.focal_tweet_id, th.conversation_id, th.expansion_limit, th.tweet_count, th.is_complete
+FROM threads th JOIN thread_tweets tt ON tt.thread_id=th.id WHERE tt.tweet_id IN (`+ph+`) ORDER BY th.id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var id, threadType, mode, focalID, conversationID string
+		var limit, count, complete int
+		if err := rows.Scan(&id, &threadType, &mode, &focalID, &conversationID, &limit, &count, &complete); err != nil {
+			return nil, err
+		}
+		out = append(out, map[string]any{"thread_id": id, "thread_type": threadType, "mode": mode, "focal_tweet_id": focalID, "conversation_id": conversationID, "expansion_limit": limit, "tweet_count": count, "is_complete": complete != 0})
+	}
+	return out, rows.Err()
 }
 
 func CSV(ctx context.Context, st *store.Store, collection, output string) (map[string]any, error) {

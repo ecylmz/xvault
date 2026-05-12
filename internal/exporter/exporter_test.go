@@ -3,6 +3,7 @@ package exporter
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,10 +23,15 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	defer st.Close()
 	page := model.ParsedPage{
 		Users:       []model.User{{ID: "u1", Username: "alice", DisplayName: "Alice"}},
-		Tweets:      []model.Tweet{{ID: "10001", Text: "export fixture tweet", AuthorID: "u1", AuthorUsername: "alice", AuthorDisplayName: "Alice", CreatedAt: "2026-01-01T00:00:00Z"}},
+		Tweets:      []model.Tweet{{ID: "10001", Text: "export fixture tweet", AuthorID: "u1", AuthorUsername: "alice", AuthorDisplayName: "Alice", ConversationID: "10001", CreatedAt: "2026-01-01T00:00:00Z"}},
 		Collections: []model.CollectionItem{{TweetID: "10001", CollectionType: "bookmark"}},
+		URLs:        []model.URL{{TweetID: "10001", URL: "https://t.co/a", ExpandedURL: "https://example.com/a"}},
+		Media:       []model.Media{{ID: "m1", TweetID: "10001", MediaType: "photo", URL: "https://pbs.twimg.com/a.jpg"}},
 	}
 	if err := st.UpsertPage(ctx, page); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Thread(ctx, "10001", "thread", 10); err != nil {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
@@ -69,6 +75,20 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	}
 	if !strings.Contains(string(htmlDoc), "data.flatMap") || strings.Contains(string(htmlDoc), "<option>bookmark</option>") {
 		t.Fatalf("html collection filter is not data-driven")
+	}
+	jsonDoc, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var archive map[string]any
+	if err := json.Unmarshal(jsonDoc, &archive); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"tweets", "users", "media", "urls", "threads"} {
+		values, ok := archive[key].([]any)
+		if !ok || len(values) == 0 {
+			t.Fatalf("json export missing %s: %#v", key, archive[key])
+		}
 	}
 	mdDoc, err := os.ReadFile(mdPath)
 	if err != nil {
