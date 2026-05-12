@@ -228,6 +228,27 @@ func TestShowByURLThreadAndVacuum(t *testing.T) {
 	if memberCount != 2 {
 		t.Fatalf("persisted thread members = %d", memberCount)
 	}
+	shouldExpand, err := s.ShouldExpandThread(ctx, "10001", "thread", 10, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shouldExpand {
+		t.Fatal("complete thread with same limit should be skipped")
+	}
+	shouldExpand, err = s.ShouldExpandThread(ctx, "10001", "thread", 10, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !shouldExpand {
+		t.Fatal("refresh should force thread expansion")
+	}
+	shouldExpand, err = s.ShouldExpandThread(ctx, "10002", "thread", 10, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !shouldExpand {
+		t.Fatal("missing thread should expand")
+	}
 	ids, err := s.CollectionTweetIDs(ctx, "bookmarks", 10)
 	if err != nil {
 		t.Fatal(err)

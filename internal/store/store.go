@@ -699,6 +699,31 @@ FROM tweets t LEFT JOIN users u ON u.id=t.author_id WHERE `+where+` ORDER BY COA
 	}, nil
 }
 
+func (s *Store) ShouldExpandThread(ctx context.Context, focalID, mode string, limit int, refresh bool) (bool, error) {
+	if refresh {
+		return true, nil
+	}
+	if limit <= 0 {
+		limit = 200
+	}
+	threadType := "conversation"
+	if mode == "thread" {
+		threadType = "thread"
+	}
+	var expansionLimit, complete int
+	err := s.db.QueryRowContext(ctx, `SELECT expansion_limit, is_complete FROM threads WHERE thread_type=? AND focal_tweet_id_key=? AND mode=?`, threadType, focalID, mode).Scan(&expansionLimit, &complete)
+	if errors.Is(err, sql.ErrNoRows) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if complete != 0 || expansionLimit >= limit {
+		return false, nil
+	}
+	return true, nil
+}
+
 type ThreadRecord struct {
 	ID             string
 	ConversationID string

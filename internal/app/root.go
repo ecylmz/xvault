@@ -445,7 +445,7 @@ func configCmd(st *state) *cobra.Command {
 
 func syncCmd(st *state) *cobra.Command {
 	var count, maxPages int
-	var all, full, withThreads bool
+	var all, full, withThreads, refreshThreads bool
 	var folder, threadMode string
 	var threadLimit, feedHours int
 	cmd := &cobra.Command{Use: "sync [collection]", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
@@ -467,6 +467,7 @@ func syncCmd(st *state) *cobra.Command {
 		sy := syncer.New(x, s, queryids.Load(""), dbPath, cookies.TWID, time.Duration(st.cfg.Sync.RequestDelayMS)*time.Millisecond)
 		results := []syncer.Result{}
 		threadsExpanded := 0
+		threadsSkipped := 0
 		countChanged := cmd.Flags().Changed("count")
 		for _, col := range collections {
 			reqCount, reqAll := syncCountForCollection(st.cfg, col, count, all, countChanged)
@@ -489,16 +490,27 @@ func syncCmd(st *state) *cobra.Command {
 					return err
 				}
 				for _, id := range ids {
+					shouldExpand, err := s.ShouldExpandThread(cmd.Context(), id, threadMode, threadLimit, refreshThreads)
+					if err != nil {
+						return err
+					}
+					if !shouldExpand {
+						threadsSkipped++
+						continue
+					}
 					if err := expandTweetDetail(cmd.Context(), st, s, id, threadMode); err != nil {
+						return err
+					}
+					if _, err := s.Thread(cmd.Context(), id, threadMode, threadLimit); err != nil {
 						return err
 					}
 					threadsExpanded++
 				}
 			}
 		}
-		data := map[string]any{"results": results, "with_threads": withThreads, "threads_expanded": threadsExpanded, "thread_mode": threadMode, "thread_limit": threadLimit}
+		data := map[string]any{"results": results, "with_threads": withThreads, "threads_expanded": threadsExpanded, "threads_skipped": threadsSkipped, "refresh_threads": refreshThreads, "thread_mode": threadMode, "thread_limit": threadLimit}
 		if len(results) == 1 {
-			data = map[string]any{"result": results[0], "with_threads": withThreads, "threads_expanded": threadsExpanded, "thread_mode": threadMode, "thread_limit": threadLimit}
+			data = map[string]any{"result": results[0], "with_threads": withThreads, "threads_expanded": threadsExpanded, "threads_skipped": threadsSkipped, "refresh_threads": refreshThreads, "thread_mode": threadMode, "thread_limit": threadLimit}
 		}
 		if st.json {
 			writeJSON(os.Stdout, "sync", st.started, data)
@@ -513,6 +525,7 @@ func syncCmd(st *state) *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&full, "full", false, "ignore incremental boundaries")
 	cmd.PersistentFlags().StringVar(&folder, "folder", "", "bookmark folder name")
 	cmd.PersistentFlags().BoolVar(&withThreads, "with-threads", false, "expand threads after sync")
+	cmd.PersistentFlags().BoolVar(&refreshThreads, "refresh-threads", false, "refresh existing thread records")
 	cmd.PersistentFlags().StringVar(&threadMode, "thread-mode", "thread", "thread expansion mode")
 	cmd.PersistentFlags().IntVar(&threadLimit, "thread-limit", 200, "thread expansion limit")
 	cmd.PersistentFlags().IntVar(&feedHours, "hours", st.cfg.Sync.FeedDefaultHours, "feed lookback hours")
@@ -1486,7 +1499,7 @@ func inSet(value string, options ...string) bool {
 
 func boolFlag(arg string) bool {
 	switch arg {
-	case "--json", "--quiet", "--verbose", "--no-color", "--all", "--full", "--with-threads", "--has-media", "--has-link", "--pretty", "--force", "--user", "--recent":
+	case "--json", "--quiet", "--verbose", "--no-color", "--all", "--full", "--with-threads", "--refresh-threads", "--has-media", "--has-link", "--pretty", "--force", "--user", "--recent":
 		return true
 	default:
 		return false
