@@ -40,6 +40,20 @@ go test ./...
 go build -o bin/xvault ./cmd/xvault
 ```
 
+## Install
+
+From a local checkout:
+
+```bash
+go install ./cmd/xvault
+```
+
+Or build a pinned local binary:
+
+```bash
+go build -trimpath -o bin/xvault ./cmd/xvault
+```
+
 ## First Run
 
 ```bash
@@ -50,6 +64,26 @@ bin/xvault doctor --json
 bin/xvault sync bookmarks --count 100 --max-pages 2 --json
 bin/xvault sync likes --count 100 --max-pages 2 --json
 bin/xvault search "llm agents" --source all --limit 10 --json
+```
+
+## Full Likes And Bookmarks Archive
+
+After `auth test` succeeds, sync the complete local archive for the two primary saved collections:
+
+```bash
+xvault sync bookmarks --all --json
+xvault sync likes --all --json
+xvault verify-archive --json
+```
+
+Query the SQLite archive through `xvault`:
+
+```bash
+xvault count bookmarks --json
+xvault count likes --json
+xvault search --recent --source bookmarks --limit 10 --json
+xvault search --recent --source likes --limit 10 --json
+xvault search "retrieval" --source all --limit 10 --json
 ```
 
 ## Main Commands
@@ -68,6 +102,7 @@ xvault bookmarks folders --json
 xvault search "query" --source bookmarks --limit 10 --json
 xvault search --recent --source bookmarks --limit 10 --json
 xvault count bookmarks --json
+xvault count likes --json
 xvault verify-archive --json
 xvault show TWEET_ID --json
 xvault export json --collection all --output archive.json --json
