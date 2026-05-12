@@ -1020,9 +1020,37 @@ func exportCmd(st *state) *cobra.Command {
 	cmd.AddCommand(jsonCmd)
 	addExport("csv", exporter.CSVWithFolder)
 	addExport("html", exporter.HTMLWithFolder)
-	addExport("markdown", func(ctx context.Context, s *store.Store, c, f, o string) (map[string]any, error) {
-		return exporter.MarkdownWithFolder(ctx, s, c, f, o, false)
-	})
+	var markdownCollection, markdownFolder, markdownOutput, markdownMode string
+	markdownCmd := &cobra.Command{Use: "markdown", RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		var data map[string]any
+		switch markdownMode {
+		case "files":
+			data, err = exporter.MarkdownWithFolder(cmd.Context(), s, markdownCollection, markdownFolder, markdownOutput, false)
+		case "single":
+			data, err = exporter.MarkdownSingleWithFolder(cmd.Context(), s, markdownCollection, markdownFolder, markdownOutput)
+		default:
+			return errCode("INVALID_ARGUMENT", "markdown mode must be single or files")
+		}
+		if err != nil {
+			return err
+		}
+		if st.json {
+			writeJSON(os.Stdout, "export markdown", st.started, data)
+		} else {
+			human(os.Stdout, "exported %s", data["output"])
+		}
+		return nil
+	}}
+	markdownCmd.Flags().StringVar(&markdownCollection, "collection", "all", "collection")
+	markdownCmd.Flags().StringVar(&markdownFolder, "folder", "", "bookmark folder")
+	markdownCmd.Flags().StringVar(&markdownOutput, "output", "", "output path")
+	markdownCmd.Flags().StringVar(&markdownMode, "mode", "files", "markdown mode: single or files")
+	cmd.AddCommand(markdownCmd)
 	addExport("hermes", func(ctx context.Context, s *store.Store, c, f, o string) (map[string]any, error) {
 		if c == "" {
 			c = "all"

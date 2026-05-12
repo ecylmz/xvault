@@ -44,8 +44,12 @@ func TestExportsWriteExpectedFiles(t *testing.T) {
 	if data, err := Markdown(ctx, st, "all", mdDir, true); err != nil || data["count"] != 1 {
 		t.Fatalf("markdown data=%#v err=%v", data, err)
 	}
+	singlePath := filepath.Join(dir, "archive.md")
+	if data, err := MarkdownSingleWithFolder(ctx, st, "all", "", singlePath); err != nil || data["count"] != 1 || data["mode"] != "single" {
+		t.Fatalf("single markdown data=%#v err=%v", data, err)
+	}
 	mdPath := filepath.Join(mdDir, "bookmarks", "2026", "2026-01-01-10001-alice.md")
-	for _, path := range []string{jsonPath, csvPath, htmlPath, filepath.Join(mdDir, "index.jsonl"), mdPath} {
+	for _, path := range []string{jsonPath, csvPath, htmlPath, filepath.Join(mdDir, "index.jsonl"), mdPath, singlePath} {
 		b, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)

@@ -108,6 +108,29 @@ func MarkdownWithFolder(ctx context.Context, st *store.Store, collection, folder
 	return map[string]any{"output": output, "count": len(results)}, nil
 }
 
+func MarkdownSingleWithFolder(ctx context.Context, st *store.Store, collection, folder, output string) (map[string]any, error) {
+	results, err := exportRows(ctx, st, collection, folder)
+	if err != nil {
+		return nil, err
+	}
+	if output == "" {
+		output = filepath.Join(os.Getenv("HOME"), ".local/share/xvault/exports/markdown/archive.md")
+	}
+	var body strings.Builder
+	body.WriteString("# xvault archive\n\n")
+	body.WriteString(fmt.Sprintf("- collection: %s\n- folder: %s\n- count: %d\n- exported_at: %s\n\n", collection, folder, len(results), time.Now().UTC().Format(time.RFC3339)))
+	for i, r := range results {
+		if i > 0 {
+			body.WriteString("\n---\n\n")
+		}
+		body.WriteString(markdownDoc(r))
+	}
+	if err := writeFile(output, []byte(body.String())); err != nil {
+		return nil, err
+	}
+	return map[string]any{"output": output, "count": len(results), "mode": "single"}, nil
+}
+
 func HTML(ctx context.Context, st *store.Store, collection, output string) (map[string]any, error) {
 	return HTMLWithFolder(ctx, st, collection, "", output)
 }
