@@ -154,6 +154,7 @@ func statusCmd(st *state) *cobra.Command {
 
 func doctorCmd(st *state) *cobra.Command {
 	var strict bool
+	var online bool
 	cmd := &cobra.Command{Use: "doctor", RunE: func(cmd *cobra.Command, args []string) error {
 		checks := []map[string]any{}
 		failed := 0
@@ -186,6 +187,10 @@ func doctorCmd(st *state) *cobra.Command {
 		}
 		status := auth.Status(cmd.Context(), st.cfg)
 		add("auth_cookies", status["auth_token"] == "present" && status["ct0"] == "present", "auth_token="+status["auth_token"]+", ct0="+status["ct0"]+", twid="+status["twid"])
+		if online {
+			ok, msg := doctorAuthOnlineStatus(cmd.Context(), st.cfg)
+			add("auth_online", ok, msg)
+		}
 		if info, err := os.Stat(config.Expand(st.cfg.Auth.DotenvPath)); err == nil {
 			add("dotenv_permissions", info.Mode().Perm()&0o077 == 0, fmt.Sprintf("mode %03o", info.Mode().Perm()))
 		} else {
@@ -213,7 +218,16 @@ func doctorCmd(st *state) *cobra.Command {
 		return nil
 	}}
 	cmd.Flags().BoolVar(&strict, "strict", false, "exit nonzero when any doctor check fails")
+	cmd.Flags().BoolVar(&online, "online", false, "include live X auth validation")
 	return cmd
+}
+
+func doctorAuthOnlineStatus(ctx context.Context, cfg config.Config) (bool, string) {
+	src, status, err := viewerAuthStatus(ctx, cfg)
+	if err != nil {
+		return false, classifyCode(err)
+	}
+	return status >= 200 && status < 300, fmt.Sprintf("source=%s http=%d", src.Name, status)
 }
 
 func gitRemoteStatus(ctx context.Context) (bool, string) {
@@ -269,37 +283,9 @@ func authCmd(st *state) *cobra.Command {
 		return nil
 	}})
 	cmd.AddCommand(&cobra.Command{Use: "test", RunE: func(cmd *cobra.Command, args []string) error {
-		c, src, err := auth.Resolve(cmd.Context(), st.cfg)
+		src, status, err := viewerAuthStatus(cmd.Context(), st.cfg)
 		if err != nil {
 			return err
-		}
-		x := client.New(client.Options{Auth: c, MaxRetries: st.cfg.Sync.MaxRetries})
-		raw, status, err := x.FetchGraphQL(cmd.Context(), client.Operation{
-			Name:    "Viewer",
-			QueryID: queryids.Load("").QueryID("Viewer"),
-			Variables: map[string]any{
-				"withCommunitiesMemberships": true,
-				"withSubscribedTab":          true,
-				"withCommunitiesCreation":    true,
-			},
-			FieldToggles: defaultFieldTogglesForApp(),
-		})
-		if err != nil {
-			return err
-		}
-		var body struct {
-			Errors []struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			} `json:"errors"`
-		}
-		if err := json.Unmarshal(raw, &body); err != nil {
-			return err
-		}
-		for _, gqlErr := range body.Errors {
-			if gqlErr.Code == 32 || gqlErr.Code == 215 || strings.Contains(strings.ToLower(gqlErr.Message), "not authenticated") {
-				return errCode("AUTH_EXPIRED", "authentication cookies were rejected by X")
-			}
 		}
 		data := map[string]any{"source": src.Name, "http_status": status, "authenticated": status >= 200 && status < 300}
 		if st.json {
@@ -371,6 +357,44 @@ func authCmd(st *state) *cobra.Command {
 	importBrowserCmd.Flags().BoolVar(&importForce, "force", false, "overwrite existing dotenv file")
 	cmd.AddCommand(importBrowserCmd)
 	return cmd
+}
+
+func viewerAuthStatus(ctx context.Context, cfg config.Config) (auth.Source, int, error) {
+	c, src, err := auth.Resolve(ctx, cfg)
+	if err != nil {
+		return auth.Source{}, 0, err
+	}
+	authCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	x := client.New(client.Options{Auth: c, MaxRetries: cfg.Sync.MaxRetries})
+	raw, status, err := x.FetchGraphQL(authCtx, client.Operation{
+		Name:    "Viewer",
+		QueryID: queryids.Load("").QueryID("Viewer"),
+		Variables: map[string]any{
+			"withCommunitiesMemberships": true,
+			"withSubscribedTab":          true,
+			"withCommunitiesCreation":    true,
+		},
+		FieldToggles: defaultFieldTogglesForApp(),
+	})
+	if err != nil {
+		return src, status, err
+	}
+	var body struct {
+		Errors []struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return src, status, err
+	}
+	for _, gqlErr := range body.Errors {
+		if gqlErr.Code == 32 || gqlErr.Code == 215 || strings.Contains(strings.ToLower(gqlErr.Message), "not authenticated") {
+			return src, status, errCode("AUTH_EXPIRED", "authentication cookies were rejected by X")
+		}
+	}
+	return src, status, nil
 }
 
 func configCmd(st *state) *cobra.Command {
