@@ -22,6 +22,19 @@ type Source struct {
 
 var ErrMissing = errors.New("authentication cookies missing")
 
+func ShapeStatus(c Cookies) (bool, string) {
+	if c.AuthToken == "" || c.CT0 == "" {
+		return false, "auth_token or ct0 missing"
+	}
+	if len(c.AuthToken) < 8 || len(c.CT0) < 8 {
+		return false, "auth_token or ct0 malformed"
+	}
+	if c.TWID != "" && (!strings.HasPrefix(c.TWID, "u=") || len(c.TWID) < 4) {
+		return false, "twid malformed"
+	}
+	return true, "auth_token=present, ct0=present, twid=" + presence(c.TWID)
+}
+
 func RedactSecret(s string) string {
 	if len(s) <= 8 {
 		return "[REDACTED]"
@@ -118,6 +131,13 @@ func first(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func presence(s string) string {
+	if s == "" {
+		return "missing"
+	}
+	return "present"
 }
 
 func ParseDotenv(path string) (map[string]string, error) {

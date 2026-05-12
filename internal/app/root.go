@@ -193,8 +193,9 @@ func doctorCmd(st *state) *cobra.Command {
 		add("export_directory", exportOK, exportMsg)
 		lockOK, lockMsg := activeLockStatus(st.cfg)
 		add("active_lock", lockOK, lockMsg)
-		status := auth.Status(cmd.Context(), st.cfg)
-		add("auth_cookies", status["auth_token"] == "present" && status["ct0"] == "present", "auth_token="+status["auth_token"]+", ct0="+status["ct0"]+", twid="+status["twid"])
+		cookies, _, _ := auth.Resolve(cmd.Context(), st.cfg)
+		authOK, authMsg := auth.ShapeStatus(cookies)
+		add("auth_cookies", authOK, authMsg)
 		if online {
 			ok, msg := doctorAuthOnlineStatus(cmd.Context(), st.cfg)
 			add("auth_online", ok, msg)

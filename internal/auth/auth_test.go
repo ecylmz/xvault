@@ -70,6 +70,23 @@ func TestDotenvBody(t *testing.T) {
 	}
 }
 
+func TestShapeStatusRejectsPlaceholders(t *testing.T) {
+	ok, msg := ShapeStatus(Cookies{AuthToken: "a", CT0: "c", TWID: "1"})
+	if ok {
+		t.Fatal("expected placeholder cookies to fail shape validation")
+	}
+	if strings.Contains(msg, " a ") || strings.Contains(msg, " c ") || strings.Contains(msg, "1") {
+		t.Fatalf("shape status leaked cookie values: %q", msg)
+	}
+}
+
+func TestShapeStatusAcceptsRealisticCookies(t *testing.T) {
+	ok, msg := ShapeStatus(Cookies{AuthToken: strings.Repeat("a", 40), CT0: strings.Repeat("c", 32), TWID: "u=12345"})
+	if !ok {
+		t.Fatalf("expected realistic cookies to pass: %s", msg)
+	}
+}
+
 func TestResolveFirefoxFromPatterns(t *testing.T) {
 	dir := t.TempDir()
 	profile := filepath.Join(dir, "profile.default")
