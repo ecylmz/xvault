@@ -110,17 +110,17 @@ CREATE TABLE urls (id INTEGER PRIMARY KEY AUTOINCREMENT, tweet_id TEXT NOT NULL,
 		t.Fatal(err)
 	}
 	defer s.Close()
-	for _, table := range []string{"tweets_fts", "tweets_fts_map", "threads", "thread_tweets", "raw_payloads", "sync_runs", "sync_checkpoints"} {
+	for _, table := range []string{"tweets_fts", "tweets_fts_map", "threads", "thread_tweets", "raw_payloads", "sync_runs", "sync_checkpoints", "mentions", "hashtags"} {
 		var name string
 		if err := s.DB().QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE name=?`, table).Scan(&name); err != nil {
 			t.Fatalf("missing migrated table %s: %v", table, err)
 		}
 	}
 	var versions int
-	if err := s.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations WHERE version IN (1,2,3,4)`).Scan(&versions); err != nil {
+	if err := s.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations WHERE version IN (1,2,3,4,5)`).Scan(&versions); err != nil {
 		t.Fatal(err)
 	}
-	if versions != 4 {
+	if versions != 5 {
 		t.Fatalf("migration versions = %d", versions)
 	}
 }
@@ -247,15 +247,24 @@ func TestShowIncludesLinksMediaAndQuotedSummary(t *testing.T) {
 	page := model.ParsedPage{
 		Users: []model.User{{ID: "u1", Username: "alice", DisplayName: "Alice"}, {ID: "u2", Username: "bob", DisplayName: "Bob"}},
 		Tweets: []model.Tweet{
-			{ID: "10001", Text: "outer tweet", AuthorID: "u1", AuthorUsername: "alice", QuotedTweetID: "10002", IsQuote: true, RawJSONID: "raw1"},
+			{ID: "10001", Text: "outer tweet", AuthorID: "u1", AuthorUsername: "alice", ConversationID: "10001", QuotedTweetID: "10002", IsQuote: true, RawJSONID: "raw1"},
 			{ID: "10002", Text: "quoted tweet", AuthorID: "u2", AuthorUsername: "bob"},
 		},
 		Collections: []model.CollectionItem{{TweetID: "10001", CollectionType: "bookmark"}},
 		URLs:        []model.URL{{TweetID: "10001", URL: "https://t.co/a", ExpandedURL: "https://example.com/a", DisplayURL: "example.com/a"}},
 		Media:       []model.Media{{ID: "m1", TweetID: "10001", MediaType: "photo", URL: "https://pbs.twimg.com/a.jpg", PreviewURL: "https://pbs.twimg.com/a.jpg", AltText: "Alt text"}},
+		Mentions:    []model.Mention{{TweetID: "10001", UserID: "u2", Username: "bob", DisplayName: "Bob"}},
+		Hashtags:    []model.Hashtag{{TweetID: "10001", Tag: "XVault"}},
 	}
 	if err := s.UpsertPage(ctx, page); err != nil {
 		t.Fatal(err)
+	}
+	thread, err := s.Thread(ctx, "10001", "thread", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if thread["tweet_count"] != 1 {
+		t.Fatalf("thread = %#v", thread)
 	}
 	got, err := s.Show(ctx, "10001")
 	if err != nil {
@@ -269,9 +278,24 @@ func TestShowIncludesLinksMediaAndQuotedSummary(t *testing.T) {
 	if !ok || len(media) != 1 || media[0].AltText != "Alt text" {
 		t.Fatalf("media = %#v", got["media"])
 	}
+	mentions, ok := got["mentions"].([]model.Mention)
+	if !ok || len(mentions) != 1 || mentions[0].Username != "bob" {
+		t.Fatalf("mentions = %#v", got["mentions"])
+	}
+	hashtags, ok := got["hashtags"].([]model.Hashtag)
+	if !ok || len(hashtags) != 1 || hashtags[0].Tag != "XVault" {
+		t.Fatalf("hashtags = %#v", got["hashtags"])
+	}
 	quoted, ok := got["quoted_tweet"].(map[string]any)
 	if !ok || quoted["tweet_id"] != "10002" || quoted["author_username"] != "bob" {
 		t.Fatalf("quoted = %#v", got["quoted_tweet"])
+	}
+	threads, ok := got["threads"].([]map[string]any)
+	if !ok || len(threads) != 1 || threads[0]["thread_id"] != "thread:10001:thread" {
+		t.Fatalf("threads = %#v", got["threads"])
+	}
+	if paths, ok := got["local_export_paths"].(map[string]string); !ok || len(paths) != 0 {
+		t.Fatalf("local_export_paths = %#v", got["local_export_paths"])
 	}
 	if got["raw_json_available"] != true {
 		t.Fatalf("raw flag = %#v", got["raw_json_available"])

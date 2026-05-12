@@ -364,6 +364,8 @@ func normalizePageForCollection(page model.ParsedPage, collection string) model.
 	page.Collections = collections
 	page.URLs = filterURLs(page.URLs, keep)
 	page.Media = filterMedia(page.Media, keep)
+	page.Mentions = filterMentions(page.Mentions, keep)
+	page.Hashtags = filterHashtags(page.Hashtags, keep)
 	return page
 }
 
@@ -382,6 +384,26 @@ func filterMedia(in []model.Media, keep map[string]bool) []model.Media {
 	for _, m := range in {
 		if keep[m.TweetID] {
 			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func filterMentions(in []model.Mention, keep map[string]bool) []model.Mention {
+	out := in[:0]
+	for _, m := range in {
+		if keep[m.TweetID] {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func filterHashtags(in []model.Hashtag, keep map[string]bool) []model.Hashtag {
+	out := in[:0]
+	for _, h := range in {
+		if keep[h.TweetID] {
+			out = append(out, h)
 		}
 	}
 	return out

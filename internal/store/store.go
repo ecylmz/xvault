@@ -190,6 +190,22 @@ ON CONFLICT(id) DO UPDATE SET name=excluded.name, last_seen_at=excluded.last_see
 			return err
 		}
 	}
+	for _, m := range page.Mentions {
+		if m.TweetID == "" || m.Username == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO mentions(tweet_id, user_id, username, display_name) VALUES(?,?,?,?)`, m.TweetID, nullString(m.UserID), m.Username, nullString(m.DisplayName)); err != nil {
+			return err
+		}
+	}
+	for _, h := range page.Hashtags {
+		if h.TweetID == "" || h.Tag == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO hashtags(tweet_id, tag) VALUES(?,?)`, h.TweetID, h.Tag); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -369,6 +385,19 @@ func (s *Store) Show(ctx context.Context, id string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	mentions, err := s.tweetMentions(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	hashtags, err := s.tweetHashtags(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	threads, err := s.tweetThreadMetadata(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	paths := s.localExportPaths(id)
 	quotedSummary, err := s.tweetSummary(ctx, quoted)
 	if err != nil {
 		return nil, err
@@ -384,9 +413,13 @@ func (s *Store) Show(ctx context.Context, id string) (map[string]any, error) {
 		"metrics":            map[string]int64{"reply_count": reply, "repost_count": retweet, "like_count": like, "quote_count": quote},
 		"links":              urls,
 		"media":              media,
+		"mentions":           mentions,
+		"hashtags":           hashtags,
 		"quoted_tweet":       quotedSummary,
 		"reposted_tweet_id":  repostedID,
 		"reposted_tweet":     repostedSummary,
+		"threads":            threads,
+		"local_export_paths": paths,
 		"raw_json_available": raw != "",
 		"raw_json_id":        raw,
 	}, nil
@@ -424,6 +457,100 @@ func (s *Store) tweetMedia(ctx context.Context, tweetID string) ([]model.Media, 
 		out = append(out, m)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) tweetMentions(ctx context.Context, tweetID string) ([]model.Mention, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT COALESCE(user_id,''), username, COALESCE(display_name,'') FROM mentions WHERE tweet_id=? ORDER BY username`, tweetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.Mention{}
+	for rows.Next() {
+		m := model.Mention{TweetID: tweetID}
+		if err := rows.Scan(&m.UserID, &m.Username, &m.DisplayName); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) tweetHashtags(ctx context.Context, tweetID string) ([]model.Hashtag, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT tag FROM hashtags WHERE tweet_id=? ORDER BY LOWER(tag), tag`, tweetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.Hashtag{}
+	for rows.Next() {
+		h := model.Hashtag{TweetID: tweetID}
+		if err := rows.Scan(&h.Tag); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) tweetThreadMetadata(ctx context.Context, tweetID string) ([]map[string]any, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT th.id, th.thread_type, th.mode, th.focal_tweet_id, th.conversation_id, th.expansion_limit, th.tweet_count, th.is_complete, tt.role, tt.position
+FROM threads th JOIN thread_tweets tt ON tt.thread_id=th.id WHERE tt.tweet_id=? ORDER BY th.thread_type, th.mode, tt.position`, tweetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var id, threadType, mode, focalID, conversationID, role string
+		var limit, count, complete, position int
+		if err := rows.Scan(&id, &threadType, &mode, &focalID, &conversationID, &limit, &count, &complete, &role, &position); err != nil {
+			return nil, err
+		}
+		out = append(out, map[string]any{
+			"thread_id": id, "thread_type": threadType, "mode": mode, "focal_tweet_id": focalID,
+			"conversation_id": conversationID, "expansion_limit": limit, "tweet_count": count,
+			"is_complete": complete != 0, "role": role, "position": position,
+		})
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) localExportPaths(tweetID string) map[string]string {
+	base := filepath.Join(os.Getenv("HOME"), ".local/share/xvault/exports")
+	candidates := map[string]string{}
+	for name, dir := range map[string]string{
+		"markdown": filepath.Join(base, "markdown"),
+		"hermes":   filepath.Join(base, "hermes"),
+		"obsidian": filepath.Join(base, "obsidian"),
+	} {
+		if path := findExportedTweetPath(dir, tweetID); path != "" {
+			candidates[name] = path
+		}
+	}
+	return candidates
+}
+
+func findExportedTweetPath(root, tweetID string) string {
+	info, err := os.Stat(root)
+	if err != nil || !info.IsDir() {
+		return ""
+	}
+	var found string
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || found != "" {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(d.Name(), ".md") && strings.Contains(d.Name(), tweetID) {
+			found = path
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return found
 }
 
 func (s *Store) tweetSummary(ctx context.Context, tweetID string) (map[string]any, error) {
@@ -1078,6 +1205,9 @@ CREATE TABLE IF NOT EXISTS collections (
 CREATE TABLE IF NOT EXISTS bookmark_folders (id TEXT PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER, first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS media (id TEXT PRIMARY KEY, tweet_id TEXT NOT NULL, media_type TEXT NOT NULL, url TEXT, expanded_url TEXT, preview_url TEXT, local_path TEXT, width INTEGER, height INTEGER, duration_ms INTEGER, alt_text TEXT, raw_json_id TEXT, FOREIGN KEY(tweet_id) REFERENCES tweets(id));
 CREATE TABLE IF NOT EXISTS urls (id INTEGER PRIMARY KEY AUTOINCREMENT, tweet_id TEXT NOT NULL, url TEXT NOT NULL, expanded_url TEXT, display_url TEXT, title TEXT, description TEXT, FOREIGN KEY(tweet_id) REFERENCES tweets(id));
+CREATE TABLE IF NOT EXISTS mentions (tweet_id TEXT NOT NULL, user_id TEXT, username TEXT NOT NULL, display_name TEXT, PRIMARY KEY(tweet_id, username), FOREIGN KEY(tweet_id) REFERENCES tweets(id));
+CREATE TABLE IF NOT EXISTS hashtags (tweet_id TEXT NOT NULL, tag TEXT NOT NULL, PRIMARY KEY(tweet_id, tag), FOREIGN KEY(tweet_id) REFERENCES tweets(id));
+INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(5, strftime('%Y-%m-%dT%H:%M:%fZ','now'));
 CREATE TABLE IF NOT EXISTS raw_payloads (id TEXT PRIMARY KEY, kind TEXT NOT NULL, operation_name TEXT, sha256 TEXT NOT NULL, payload BLOB NOT NULL, compressed INTEGER NOT NULL DEFAULT 1, captured_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sync_runs (id TEXT PRIMARY KEY, collection_type TEXT NOT NULL, mode TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, pages_fetched INTEGER NOT NULL DEFAULT 0, tweets_seen INTEGER NOT NULL DEFAULT 0, tweets_inserted INTEGER NOT NULL DEFAULT 0, tweets_updated INTEGER NOT NULL DEFAULT 0, tweets_unchanged INTEGER NOT NULL DEFAULT 0, errors_count INTEGER NOT NULL DEFAULT 0, rate_limit_count INTEGER NOT NULL DEFAULT 0, error_code TEXT, error_message TEXT);
 CREATE TABLE IF NOT EXISTS sync_checkpoints (collection_type TEXT PRIMARY KEY, cursor TEXT, last_tweet_id TEXT, last_sort_index TEXT, source_run_id TEXT, total_seen INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, status TEXT NOT NULL);

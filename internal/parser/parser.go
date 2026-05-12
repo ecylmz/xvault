@@ -28,11 +28,13 @@ func Timeline(raw []byte, collectionType, folderID, folderName, rawID string) (m
 			seenUsers[u.ID] = true
 			p.Users = append(p.Users, u)
 		}
-		if tw, urls, media, ok := parseTweet(m, rawID); ok && !seenTweets[tw.ID] {
+		if tw, urls, media, mentions, hashtags, ok := parseTweet(m, rawID); ok && !seenTweets[tw.ID] {
 			seenTweets[tw.ID] = true
 			p.Tweets = append(p.Tweets, tw)
 			p.URLs = append(p.URLs, urls...)
 			p.Media = append(p.Media, media...)
+			p.Mentions = append(p.Mentions, mentions...)
+			p.Hashtags = append(p.Hashtags, hashtags...)
 			if collectionType != "" {
 				p.Collections = append(p.Collections, model.CollectionItem{
 					TweetID: tw.ID, CollectionType: collectionType, BookmarkFolderID: folderID,
@@ -44,18 +46,18 @@ func Timeline(raw []byte, collectionType, folderID, folderName, rawID string) (m
 	return p, nil
 }
 
-func parseTweet(m map[string]any, rawID string) (model.Tweet, []model.URL, []model.Media, bool) {
+func parseTweet(m map[string]any, rawID string) (model.Tweet, []model.URL, []model.Media, []model.Mention, []model.Hashtag, bool) {
 	id := str(m, "rest_id", "id_str", "id")
 	legacy := obj(m, "legacy")
 	if id == "" {
 		id = str(legacy, "id_str", "id")
 	}
 	if !idRe.MatchString(id) {
-		return model.Tweet{}, nil, nil, false
+		return model.Tweet{}, nil, nil, nil, nil, false
 	}
 	text := first(str(legacy, "full_text", "text"), str(m, "full_text", "text"))
 	if text == "" && !looksTweet(m) {
-		return model.Tweet{}, nil, nil, false
+		return model.Tweet{}, nil, nil, nil, nil, false
 	}
 	authorID := str(legacy, "user_id_str", "user_id")
 	if authorID == "" {
@@ -108,10 +110,30 @@ func parseTweet(m map[string]any, rawID string) (model.Tweet, []model.URL, []mod
 	}
 	var urls []model.URL
 	var media []model.Media
+	var mentions []model.Mention
+	var hashtags []model.Hashtag
 	entities := obj(legacy, "entities")
 	for _, u := range arrKey(entities, "urls") {
 		if um, ok := u.(map[string]any); ok {
 			urls = append(urls, model.URL{TweetID: id, URL: str(um, "url"), ExpandedURL: str(um, "expanded_url"), DisplayURL: str(um, "display_url")})
+		}
+	}
+	for _, mention := range arrKey(entities, "user_mentions") {
+		if mm, ok := mention.(map[string]any); ok {
+			username := str(mm, "screen_name")
+			if username == "" {
+				continue
+			}
+			mentions = append(mentions, model.Mention{TweetID: id, UserID: str(mm, "id_str", "id"), Username: username, DisplayName: str(mm, "name")})
+		}
+	}
+	for _, hashtag := range arrKey(entities, "hashtags") {
+		if hm, ok := hashtag.(map[string]any); ok {
+			tag := first(str(hm, "text"), str(hm, "tag"))
+			if tag == "" {
+				continue
+			}
+			hashtags = append(hashtags, model.Hashtag{TweetID: id, Tag: tag})
 		}
 	}
 	for _, mm := range append(arrKey(entities, "media"), arrKey(obj(legacy, "extended_entities"), "media")...) {
@@ -119,7 +141,7 @@ func parseTweet(m map[string]any, rawID string) (model.Tweet, []model.URL, []mod
 			media = append(media, model.Media{ID: str(med, "id_str", "media_key"), TweetID: id, MediaType: str(med, "type"), URL: str(med, "media_url_https", "media_url"), ExpandedURL: str(med, "expanded_url"), PreviewURL: str(med, "media_url_https", "media_url"), AltText: str(med, "ext_alt_text")})
 		}
 	}
-	return tw, urls, media, true
+	return tw, urls, media, mentions, hashtags, true
 }
 
 func parseUser(m map[string]any) (model.User, bool) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ecylmz/xvault/internal/auth"
 	"github.com/ecylmz/xvault/internal/client"
+	"github.com/ecylmz/xvault/internal/model"
 	"github.com/ecylmz/xvault/internal/queryids"
 	"github.com/ecylmz/xvault/internal/store"
 )
@@ -251,5 +252,23 @@ func TestSyncRunStoresSanitizedFailureMessage(t *testing.T) {
 	}
 	if run.ErrorCode != "AUTH_EXPIRED" || run.ErrorMessage != "authentication cookies were rejected by X" {
 		t.Fatalf("sync run = %#v", run)
+	}
+}
+
+func TestEntityFiltersFollowKeptTweets(t *testing.T) {
+	keep := map[string]bool{"10001": true}
+	mentions := filterMentions([]model.Mention{
+		{TweetID: "10001", Username: "alice"},
+		{TweetID: "10002", Username: "bob"},
+	}, keep)
+	if len(mentions) != 1 || mentions[0].Username != "alice" {
+		t.Fatalf("mentions = %#v", mentions)
+	}
+	hashtags := filterHashtags([]model.Hashtag{
+		{TweetID: "10001", Tag: "Keep"},
+		{TweetID: "10002", Tag: "Drop"},
+	}, keep)
+	if len(hashtags) != 1 || hashtags[0].Tag != "Keep" {
+		t.Fatalf("hashtags = %#v", hashtags)
 	}
 }

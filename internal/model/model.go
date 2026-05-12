@@ -70,12 +70,26 @@ type Media struct {
 	AltText     string `json:"alt_text,omitempty"`
 }
 
+type Mention struct {
+	TweetID     string `json:"tweet_id"`
+	UserID      string `json:"user_id,omitempty"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name,omitempty"`
+}
+
+type Hashtag struct {
+	TweetID string `json:"tweet_id"`
+	Tag     string `json:"tag"`
+}
+
 type ParsedPage struct {
 	Tweets      []Tweet
 	Users       []User
 	Collections []CollectionItem
 	URLs        []URL
 	Media       []Media
+	Mentions    []Mention
+	Hashtags    []Hashtag
 	NextCursor  string
 	RawID       string
 }
