@@ -24,8 +24,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.26.x"
-      - run: go test ./...
-      - run: make release-check
+      - run: make ci
       - name: Build
         run: |
           mkdir -p dist
