@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -28,6 +29,27 @@ func TestParseDotenvQuotedAndAliases(t *testing.T) {
 	c := fromMap(func(k string) string { return got[k] })
 	if c.AuthToken != "secret-token" || c.CT0 != "csrf-token" || c.TWID != "u=123" {
 		t.Fatalf("unexpected cookies: %#v", c)
+	}
+}
+
+func TestParseDotenvRejectsUnsupportedSyntax(t *testing.T) {
+	for name, body := range map[string]string{
+		"command substitution":  "XVAULT_AUTH_TOKEN=$(security find-generic-password)\nXVAULT_CT0=csrf\n",
+		"backtick substitution": "XVAULT_AUTH_TOKEN=`security find-generic-password`\nXVAULT_CT0=csrf\n",
+		"unterminated quote":    "XVAULT_AUTH_TOKEN=\"secret-token\nXVAULT_CT0=csrf\n",
+		"partial quote":         "XVAULT_AUTH_TOKEN=secret\"token\nXVAULT_CT0=csrf\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), ".env")
+			if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ParseDotenv(path); err == nil {
+				t.Fatal("expected dotenv parse error")
+			} else if strings.Contains(err.Error(), "secret-token") || strings.Contains(err.Error(), "security find-generic-password") {
+				t.Fatalf("parse error leaked value: %v", err)
+			}
+		})
 	}
 }
 

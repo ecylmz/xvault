@@ -139,17 +139,35 @@ func ParseDotenv(path string) (map[string]string, error) {
 		}
 		k = strings.TrimSpace(k)
 		v = strings.TrimSpace(v)
-		if strings.Contains(v, "\n") || strings.Contains(v, "\r") {
-			continue
+		parsed, err := parseDotenvValue(v)
+		if err != nil {
+			return nil, err
 		}
-		if len(v) >= 2 {
-			if (v[0] == '"' && v[len(v)-1] == '"') || (v[0] == '\'' && v[len(v)-1] == '\'') {
-				v = v[1 : len(v)-1]
-			}
-		}
-		out[k] = v
+		out[k] = parsed
 	}
 	return out, sc.Err()
+}
+
+func parseDotenvValue(v string) (string, error) {
+	if strings.Contains(v, "\n") || strings.Contains(v, "\r") {
+		return "", errors.New("invalid dotenv value: multiline values are not supported")
+	}
+	if strings.Contains(v, "$(") || strings.Contains(v, "`") {
+		return "", errors.New("invalid dotenv value: command substitution is not supported")
+	}
+	if v == "" {
+		return "", nil
+	}
+	if v[0] == '"' || v[0] == '\'' {
+		if len(v) < 2 || v[len(v)-1] != v[0] {
+			return "", errors.New("invalid dotenv value: unterminated quoted value")
+		}
+		return v[1 : len(v)-1], nil
+	}
+	if strings.Contains(v, "\"") || strings.Contains(v, "'") {
+		return "", errors.New("invalid dotenv value: quotes must wrap the full value")
+	}
+	return v, nil
 }
 
 func EnvCookies() Cookies {
