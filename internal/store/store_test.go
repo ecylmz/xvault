@@ -29,6 +29,13 @@ func TestStoreUpsertSearchAndCollections(t *testing.T) {
 	if err := s.UpsertPage(ctx, page); err != nil {
 		t.Fatal(err)
 	}
+	var urlRows int
+	if err := s.DB().QueryRowContext(ctx, `SELECT COUNT(*) FROM urls WHERE tweet_id='10001'`).Scan(&urlRows); err != nil {
+		t.Fatal(err)
+	}
+	if urlRows != 1 {
+		t.Fatalf("url rows after repeated upsert = %d", urlRows)
+	}
 	results, err := s.Search(ctx, "defect", "bookmarks", "", "Research", 10, 0)
 	if err != nil {
 		t.Fatal(err)

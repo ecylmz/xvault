@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	archiveimport "github.com/ecylmz/xvault/internal/archive"
 	"github.com/ecylmz/xvault/internal/auth"
 	"github.com/ecylmz/xvault/internal/client"
 	"github.com/ecylmz/xvault/internal/config"
@@ -128,7 +129,7 @@ func addCommands(root *cobra.Command, st *state) {
 		}
 		return nil
 	}})
-	root.AddCommand(statusCmd(st), doctorCmd(st), statsCmd(st), authCmd(st), configCmd(st), syncCmd(st), searchCmd(st), showCmd(st), showURLCmd(st), openCmd(st), threadCmd(st), conversationCmd(st), exportCmd(st), dbCmd(st), backupCmd(st), vacuumCmd(st), serviceCmd(st), refreshIDsCmd(st))
+	root.AddCommand(statusCmd(st), doctorCmd(st), statsCmd(st), authCmd(st), configCmd(st), importCmd(st), syncCmd(st), searchCmd(st), showCmd(st), showURLCmd(st), openCmd(st), threadCmd(st), conversationCmd(st), exportCmd(st), dbCmd(st), backupCmd(st), vacuumCmd(st), serviceCmd(st), refreshIDsCmd(st))
 	root.AddCommand(bookmarksCmd(st))
 	root.AddCommand(countCmd(st))
 	root.AddCommand(verifyArchiveCmd(st))
@@ -602,6 +603,122 @@ func configCmd(st *state) *cobra.Command {
 		return nil
 	}})
 	return cmd
+}
+
+func importCmd(st *state) *cobra.Command {
+	cmd := &cobra.Command{Use: "import", Short: "Import local archive files"}
+	archiveCmd := &cobra.Command{Use: "archive [ZIP]", Short: "Import a downloaded Twitter/X archive ZIP", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		releaseLock, err := acquireOperationLock(st.cfg)
+		if err != nil {
+			return err
+		}
+		defer releaseLock()
+
+		archivePath := ""
+		if len(args) == 1 {
+			archivePath = args[0]
+		}
+		archivePath, err = resolveArchiveImportPath(archivePath)
+		if err != nil {
+			return err
+		}
+		parsed, err := archiveimport.ParseZip(archivePath)
+		if err != nil {
+			return err
+		}
+		s, err := store.Open(config.Expand(st.cfg.Database.Path))
+		if err != nil {
+			return err
+		}
+		defer func() { _ = s.Close() }()
+
+		before, err := importStoreCounts(cmd.Context(), s)
+		if err != nil {
+			return err
+		}
+		if err := s.UpsertPage(cmd.Context(), parsed.Page); err != nil {
+			return err
+		}
+		after, err := importStoreCounts(cmd.Context(), s)
+		if err != nil {
+			return err
+		}
+		data := map[string]any{
+			"archive": parsed.Summary,
+			"before":  before,
+			"after":   after,
+			"added": map[string]int64{
+				"total_tweets": after["total_tweets"] - before["total_tweets"],
+				"tweets":       after["tweets"] - before["tweets"],
+				"likes":        after["likes"] - before["likes"],
+				"bookmarks":    after["bookmarks"] - before["bookmarks"],
+			},
+		}
+		if st.json {
+			writeJSON(os.Stdout, "import archive", st.started, data)
+		} else {
+			human(os.Stdout, "imported %s: tweets=%d likes=%d bookmarks=%d new_tweets=%d",
+				archivePath, parsed.Summary.TweetsSeen+parsed.Summary.NoteTweetsSeen, parsed.Summary.LikesSeen, parsed.Summary.BookmarksSeen,
+				after["total_tweets"]-before["total_tweets"])
+		}
+		return nil
+	}}
+	cmd.AddCommand(archiveCmd)
+	return cmd
+}
+
+func resolveArchiveImportPath(value string) (string, error) {
+	if value != "" {
+		info, err := os.Stat(value)
+		if err != nil {
+			return "", err
+		}
+		if info.IsDir() {
+			return "", errCode("ARCHIVE_PATH_INVALID", "archive path must be a zip file")
+		}
+		return value, nil
+	}
+	matches, err := filepath.Glob("*.zip")
+	if err != nil {
+		return "", err
+	}
+	if len(matches) == 0 {
+		return "", errCode("ARCHIVE_NOT_FOUND", "no archive zip found in the current directory; pass a path")
+	}
+	likely := []string{}
+	for _, match := range matches {
+		name := strings.ToLower(filepath.Base(match))
+		if strings.HasPrefix(name, "twitter-") || strings.HasPrefix(name, "x-") || strings.Contains(name, "archive") {
+			likely = append(likely, match)
+		}
+	}
+	if len(likely) == 1 {
+		return likely[0], nil
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+	return "", errCode("ARCHIVE_AMBIGUOUS", "multiple archive-like zip files found; pass the archive path explicitly")
+}
+
+func importStoreCounts(ctx context.Context, s *store.Store) (map[string]int64, error) {
+	total, err := s.TotalTweetCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tweets, err := s.CollectionCount(ctx, "tweets")
+	if err != nil {
+		return nil, err
+	}
+	likes, err := s.CollectionCount(ctx, "likes")
+	if err != nil {
+		return nil, err
+	}
+	bookmarks, err := s.CollectionCount(ctx, "bookmarks")
+	if err != nil {
+		return nil, err
+	}
+	return map[string]int64{"total_tweets": total, "tweets": tweets, "likes": likes, "bookmarks": bookmarks}, nil
 }
 
 func syncCmd(st *state) *cobra.Command {

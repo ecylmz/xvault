@@ -5,6 +5,28 @@ from the matching version section in this file.
 
 ## [Unreleased]
 
+## [v0.1.2] - 2026-05-13
+
+### Added
+
+- Add idempotent `xvault import archive [ZIP]` support for downloaded
+  Twitter/X archives, including own tweets, note tweets, deleted tweet headers,
+  likes, bookmark exports, and tweet entities.
+
+### Documentation
+
+- Document archive ZIP import in the README, operations guide, schema notes, and
+  agent command contract.
+
+### Fixed
+
+- De-duplicate URL entity rows on repeated tweet upserts so repeated archive
+  imports and sync replays do not grow duplicate `urls` rows.
+
+### Security
+
+- Ignore downloaded Twitter/X archive ZIPs in Git and Docker contexts.
+
 ## [v0.1.1] - 2026-05-13
 
 ### Added

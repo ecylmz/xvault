@@ -47,6 +47,8 @@ xvault sync feed --hours 24 --count 100 --max-pages 2 --json
 xvault sync runs --limit 10 --json
 xvault sync summary --json
 xvault sync checkpoints --json
+xvault import archive ~/Downloads/twitter-archive.zip --json
+xvault --db ./scratch.sqlite import archive ./twitter-archive.zip --json
 xvault bookmarks folders --json
 xvault search "query" --source all --limit 10 --json
 xvault search "query" --source bookmarks --limit 10 --json
@@ -95,3 +97,21 @@ xvault verify-archive --json
 ```
 
 Use `--max-pages` whenever predictable network behavior matters.
+
+## Archive Import Guidance
+
+Use archive import only when the user explicitly wants to load a local
+Twitter/X archive ZIP into SQLite:
+
+```bash
+xvault import archive PATH_TO_ARCHIVE.zip --json
+```
+
+For inspection or rehearsal, import into a scratch database first:
+
+```bash
+xvault --db ./scratch.sqlite import archive PATH_TO_ARCHIVE.zip --json
+```
+
+The command is idempotent. If the same archive is imported again into the same
+database, the `added` counts should be zero unless other data changed.

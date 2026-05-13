@@ -1,6 +1,7 @@
 package app
 
 import (
+	archivezip "archive/zip"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -147,6 +148,81 @@ func TestEmptyListJSONUsesArrays(t *testing.T) {
 	}
 }
 
+func TestImportArchiveCommandIsIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "archive.sqlite")
+	archivePath := writeCLIArchive(t, map[string]string{
+		"sample/data/account.js": `window.YTD.account.part0 = [
+  { "account": { "accountId": "25401953", "username": "alice", "accountDisplayName": "Alice" } }
+]`,
+		"sample/data/tweets.js": `window.YTD.tweets.part0 = [
+  { "tweet": {
+    "id_str": "100000",
+    "created_at": "Tue Jun 03 19:32:20 +0000 2025",
+    "full_text": "archive import test https://t.co/a",
+    "entities": { "urls": [{ "url": "https://t.co/a", "expanded_url": "https://example.com/a", "display_url": "example.com/a" }] }
+  } }
+]`,
+		"sample/data/like.js": `window.YTD.like.part0 = [
+  { "like": { "tweetId": "200000", "fullText": "liked archive item", "expandedUrl": "https://x.com/bob/status/200000" } }
+]`,
+		"sample/data/bookmark.js": `window.YTD.bookmark.part0 = [
+  { "bookmark": { "tweetId": "300000", "fullText": "saved archive item", "expandedUrl": "https://x.com/carol/status/300000" } }
+]`,
+	})
+
+	code, out := executeCaptureStdout(t, []string{"--db", db, "import", "archive", archivePath, "--json"})
+	if code != 0 {
+		t.Fatalf("first import exit=%d output=%s", code, out)
+	}
+	code, out = executeCaptureStdout(t, []string{"--db", db, "import", "archive", archivePath, "--json"})
+	if code != 0 {
+		t.Fatalf("second import exit=%d output=%s", code, out)
+	}
+	var env Envelope
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatal(err)
+	}
+	data, ok := env.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("data = %#v", env.Data)
+	}
+	added, ok := data["added"].(map[string]any)
+	if !ok {
+		t.Fatalf("added = %#v", data["added"])
+	}
+	for _, key := range []string{"total_tweets", "tweets", "likes", "bookmarks"} {
+		if added[key] != float64(0) {
+			t.Fatalf("second import added[%s] = %#v", key, added[key])
+		}
+	}
+	s, err := store.Open(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if count, err := s.CollectionCount(t.Context(), "tweets"); err != nil || count != 1 {
+		t.Fatalf("tweets count = %d err=%v", count, err)
+	}
+	if count, err := s.CollectionCount(t.Context(), "likes"); err != nil || count != 1 {
+		t.Fatalf("likes count = %d err=%v", count, err)
+	}
+	if count, err := s.CollectionCount(t.Context(), "bookmarks"); err != nil || count != 1 {
+		t.Fatalf("bookmarks count = %d err=%v", count, err)
+	}
+	var urlRows int
+	if err := s.DB().QueryRowContext(t.Context(), `SELECT COUNT(*) FROM urls WHERE tweet_id='100000'`).Scan(&urlRows); err != nil {
+		t.Fatal(err)
+	}
+	if urlRows != 1 {
+		t.Fatalf("url rows = %d", urlRows)
+	}
+	results, err := s.Search(t.Context(), "archive", "all", "", "", 10, 0)
+	if err != nil || len(results) != 3 {
+		t.Fatalf("search results=%d err=%v", len(results), err)
+	}
+}
+
 func TestServiceExamplesIncludeBookmarksAndLikes(t *testing.T) {
 	code, out := executeCaptureStdout(t, []string{"service", "cron", "print"})
 	if code != 0 {
@@ -218,6 +294,32 @@ func executeCaptureStdout(t *testing.T, args []string) (int, string) {
 		t.Fatal(err)
 	}
 	return code, string(out)
+}
+
+func writeCLIArchive(t *testing.T, files map[string]string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "twitter-archive.zip")
+	out, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := archivezip.NewWriter(out)
+	for name, content := range files {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func TestErrorEnvelopeDoesNotLeakKnownSecretWords(t *testing.T) {

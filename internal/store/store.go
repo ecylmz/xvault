@@ -178,7 +178,7 @@ ON CONFLICT(id) DO UPDATE SET name=excluded.name, last_seen_at=excluded.last_see
 		}
 	}
 	for _, u := range page.URLs {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO urls(tweet_id, url, expanded_url, display_url) VALUES(?,?,?,?)`, u.TweetID, u.URL, u.ExpandedURL, u.DisplayURL); err != nil {
+		if err := insertURL(ctx, tx, u); err != nil {
 			return err
 		}
 	}
@@ -207,6 +207,21 @@ ON CONFLICT(id) DO UPDATE SET name=excluded.name, last_seen_at=excluded.last_see
 		}
 	}
 	return tx.Commit()
+}
+
+func insertURL(ctx context.Context, tx *sql.Tx, u model.URL) error {
+	if u.TweetID == "" || u.URL == "" {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO urls(tweet_id, url, expanded_url, display_url)
+SELECT ?,?,?,?
+WHERE NOT EXISTS (
+  SELECT 1 FROM urls
+  WHERE tweet_id=? AND url=? AND COALESCE(expanded_url,'')=? AND COALESCE(display_url,'')=?
+)`,
+		u.TweetID, u.URL, nullString(u.ExpandedURL), nullString(u.DisplayURL),
+		u.TweetID, u.URL, u.ExpandedURL, u.DisplayURL)
+	return err
 }
 
 func upsertTweet(ctx context.Context, tx *sql.Tx, tw model.Tweet) error {
@@ -1006,6 +1021,12 @@ func (s *Store) BookmarkFolderIDByName(ctx context.Context, name string) (string
 func (s *Store) CollectionCount(ctx context.Context, collection string) (int64, error) {
 	var count int64
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT tweet_id) FROM collections WHERE collection_type=?`, normalizeCollection(collection)).Scan(&count)
+	return count, err
+}
+
+func (s *Store) TotalTweetCount(ctx context.Context) (int64, error) {
+	var count int64
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tweets`).Scan(&count)
 	return count, err
 }
 

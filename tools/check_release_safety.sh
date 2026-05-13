@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-bad="$(git ls-files | grep -E '(^|/)(\.env(\..*)?|bin/|dist/|xvault$)|\.(env|env\..*|sqlite|sqlite-[^/]*|db|db-[^/]*)$|(^|/)coverage\.out$|\.test$' || true)"
+bad="$(git ls-files | grep -E '(^|/)(\.env(\..*)?|bin/|dist/|xvault$)|\.(env|env\..*|sqlite|sqlite-[^/]*|db|db-[^/]*)$|(^|/)coverage\.out$|\.test$|(^|/)(twitter-|x-).*\.zip$|(^|/).*archive.*\.zip$' || true)"
 
 if [ -n "$bad" ]; then
   printf '%s\n' "release safety check failed: tracked generated or secret-like files:" >&2
@@ -28,6 +28,7 @@ for ignore_file in .gitignore .dockerignore; do
   check_ignore "$ignore_file" '(^|/|^\*)\*?\.sqlite' "SQLite databases"
   check_ignore "$ignore_file" '(^|/)bin/' "local binaries"
   check_ignore "$ignore_file" '(^|/)dist/' "release artifacts"
+  check_ignore "$ignore_file" '(^|/)twitter-\*\.zip$|(^|/)x-\*\.zip$|^\*archive\*\.zip$' "downloaded archive zip files"
 done
 
 git diff --check

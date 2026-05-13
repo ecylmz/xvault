@@ -11,6 +11,14 @@ xvault service cron print
 
 The generated examples include separate bookmark and likes sync jobs.
 
+To seed a database from a downloaded Twitter/X archive before scheduling live
+sync, import the ZIP once. Re-running the same import is safe and should report
+zero added rows:
+
+```bash
+xvault import archive ~/Downloads/twitter-archive.zip --json
+```
+
 Run bounded syncs in automation:
 
 ```bash

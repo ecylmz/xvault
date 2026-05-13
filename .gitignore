@@ -10,6 +10,9 @@
 *.env
 *.env.*
 !.env.example
+twitter-*.zip
+x-*.zip
+*archive*.zip
 .DS_Store
 coverage.out
 *.test

@@ -8,6 +8,8 @@ The database contains:
 - `bookmark_folders`
 - `media`
 - `urls`
+- `mentions`
+- `hashtags`
 - `raw_payloads`
 - `sync_runs`
 - `sync_checkpoints`
@@ -15,6 +17,9 @@ The database contains:
 - `tweets_fts_map`
 
 The checked-in SQL files under `migrations/` mirror the schema embedded in the Go binary and can be applied to an empty SQLite database for inspection or external tooling.
+
+Live sync and archive import both write into these same canonical tables. There
+are no separate archive-only shadow tables.
 
 FTS is contentless. Search previews come from `tweets.text`, not from SQLite `snippet()` or `highlight()`.
 

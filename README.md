@@ -31,7 +31,7 @@ your X account.
 | Area | Supported |
 |---|---|
 | Authentication | dotenv, env vars, config, browser cookies |
-| Sync | likes, bookmarks, tweets, posts, replies, reposts, feed |
+| Sync and import | likes, bookmarks, tweets, posts, replies, reposts, feed, archive ZIP import |
 | Storage | local SQLite, migrations, WAL, compressed raw payloads, FTS5 |
 | Search | full-text search, collection filters, recent results, author/date/media/link filters |
 | Export | JSON, Markdown, CSV, HTML, Hermes, Obsidian |
@@ -117,6 +117,12 @@ xvault sync bookmarks --count 100 --max-pages 2 --json
 xvault sync likes --count 100 --max-pages 2 --json
 ```
 
+Or import a downloaded Twitter/X archive ZIP without contacting X:
+
+```bash
+xvault import archive ~/Downloads/twitter-archive.zip --json
+```
+
 Search locally:
 
 ```bash
@@ -152,6 +158,13 @@ xvault sync feed --hours 24 --count 100 --max-pages 2 --json
 xvault sync runs --limit 10 --json
 xvault sync checkpoints --json
 xvault sync summary --json
+```
+
+### Import
+
+```bash
+xvault import archive ~/Downloads/twitter-archive.zip --json
+xvault --db ./scratch.sqlite import archive ./twitter-archive.zip --json
 ```
 
 ### Search and inspect
@@ -266,6 +279,7 @@ See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for more detail.
 | [`docs/CONFIG.md`](docs/CONFIG.md) | Configuration files, paths, and defaults |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Cookie handling, redaction, and agent isolation |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Automation, diagnostics, and operational workflows |
+| [`docs/IMPORT.md`](docs/IMPORT.md) | Idempotent Twitter/X archive ZIP import |
 | [`docs/EXPORTS.md`](docs/EXPORTS.md) | Export formats and output layouts |
 | [`docs/SCHEMA.md`](docs/SCHEMA.md) | SQLite schema and FTS notes |
 | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Common problems and fixes |
